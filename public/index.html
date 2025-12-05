@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Xandeum Pod Monitor</title>
+    <link rel="stylesheet" href="style.css">
+    <!-- xterm.js for terminal -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-content">
+                <h1>⚡ Xandeum Pod Monitor</h1>
+                <div class="health-indicator">
+                    <span id="health-score">--</span>
+                    <span id="health-status" class="status-badge">Loading...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- Navigation Tabs -->
+        <nav class="tabs">
+            <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+            <button class="tab-btn" data-tab="services">Services</button>
+            <button class="tab-btn" data-tab="logs">Logs</button>
+            <button class="tab-btn" data-tab="api">pRPC API</button>
+            <button class="tab-btn" data-tab="network">Network</button>
+            <button class="tab-btn" data-tab="terminal">Terminal</button>
+        </nav>
+
+        <!-- Tab Content -->
+        <div class="content">
+            <!-- Dashboard Tab -->
+            <div id="dashboard-tab" class="tab-content active">
+                <h2>Dashboard Overview</h2>
+                
+                <!-- System Stats -->
+                <div class="card-grid">
+                    <div class="card">
+                        <h3>CPU</h3>
+                        <div class="stat-value" id="cpu-usage">--</div>
+                        <div class="stat-label">Usage</div>
+                    </div>
+                    <div class="card">
+                        <h3>Memory</h3>
+                        <div class="stat-value" id="memory-usage">--</div>
+                        <div class="stat-label">Usage</div>
+                    </div>
+                    <div class="card">
+                        <h3>Disk</h3>
+                        <div class="stat-value" id="disk-usage">--</div>
+                        <div class="stat-label">Used</div>
+                    </div>
+                    <div class="card">
+                        <h3>Uptime</h3>
+                        <div class="stat-value" id="uptime">--</div>
+                        <div class="stat-label">System</div>
+                    </div>
+                </div>
+
+                <!-- Service Status -->
+                <div class="section">
+                    <h3>Service Status</h3>
+                    <div id="service-status" class="service-grid">
+                        <!-- Populated by JavaScript -->
+                    </div>
+                </div>
+
+                <!-- Network Status -->
+                <div class="section">
+                    <h3>Network Status</h3>
+                    <div id="network-status">
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Services Tab -->
+            <div id="services-tab" class="tab-content">
+                <h2>Service Management</h2>
+                <div class="action-bar">
+                    <button class="btn btn-primary" onclick="restartAllServices()">Restart All Services</button>
+                    <button class="btn btn-secondary" onclick="refreshServices()">Refresh</button>
+                </div>
+                <div id="services-list">
+                    <!-- Populated by JavaScript -->
+                </div>
+            </div>
+
+            <!-- Logs Tab -->
+            <div id="logs-tab" class="tab-content">
+                <h2>Service Logs</h2>
+                <div class="log-controls">
+                    <select id="log-service">
+                        <option value="pod">pod</option>
+                        <option value="xandminer">xandminer</option>
+                        <option value="xandminerd">xandminerd</option>
+                    </select>
+                    <input type="text" id="log-filter" placeholder="Filter logs (e.g., 'error', 'pubkey')">
+                    <button class="btn btn-primary" onclick="loadLogs()">Load Logs</button>
+                    <button class="btn btn-secondary" onclick="findPubkey()">Find Pubkey</button>
+                </div>
+                <div id="logs-output" class="logs-container">
+                    <p>Select a service and click "Load Logs"</p>
+                </div>
+            </div>
+
+            <!-- pRPC API Tab -->
+            <div id="api-tab" class="tab-content">
+                <h2>pRPC API Testing</h2>
+                <div class="api-controls">
+                    <button class="btn btn-primary" onclick="callAPI('get-version')">Get Version</button>
+                    <button class="btn btn-primary" onclick="callAPI('get-stats')">Get Stats</button>
+                    <button class="btn btn-primary" onclick="callAPI('get-pods')">Get Pods</button>
+                </div>
+                <div class="section">
+                    <h3>Custom RPC Call</h3>
+                    <input type="text" id="custom-method" placeholder="Method name (e.g., get-balance)">
+                    <button class="btn btn-secondary" onclick="callCustomAPI()">Call</button>
+                </div>
+                <div id="api-output" class="api-container">
+                    <p>Click a button to make an API call</p>
+                </div>
+            </div>
+
+            <!-- Network Tab -->
+            <div id="network-tab" class="tab-content">
+                <h2>Network Diagnostics</h2>
+                <button class="btn btn-primary" onclick="runNetworkDiagnostics()">Run Diagnostics</button>
+                <div id="network-output">
+                    <p>Click "Run Diagnostics" to check network connectivity</p>
+                </div>
+            </div>
+
+            <!-- Terminal Tab -->
+            <div id="terminal-tab" class="tab-content">
+                <h2>Interactive Terminal</h2>
+                <div class="terminal-controls">
+                    <button class="btn btn-secondary" onclick="sendQuickCommand('wget https://raw.githubusercontent.com/Xandeum/xandminer-installer/refs/heads/master/install.sh')">Download Installer</button>
+                    <button class="btn btn-secondary" onclick="sendQuickCommand('sudo bash install.sh')">Run Installer</button>
+                    <button class="btn btn-secondary" onclick="sendQuickCommand('sudo bash install.sh -d')">Run Installer (Dev)</button>
+                    <button class="btn btn-secondary" onclick="sendQuickCommand('/root/check_network.sh')">Check Network</button>
+                    <button class="btn btn-secondary" onclick="sendQuickCommand('systemctl status pod')">Pod Status</button>
+                    <button class="btn btn-danger" onclick="reconnectTerminal()">Reconnect</button>
+                </div>
+                <div id="terminal-container" class="terminal-wrapper"></div>
+                <div class="terminal-warning">
+                    <strong>⚠️ Warning:</strong> This is a real terminal. Dangerous commands will require confirmation.
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <p>Xandeum Pod Monitor v1.0.0 | <a href="https://docs.xandeum.network" target="_blank">Documentation</a> | Auto-refresh: <span id="refresh-countdown">10</span>s</p>
+        </footer>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

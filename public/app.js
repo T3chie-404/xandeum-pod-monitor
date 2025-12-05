@@ -1,0 +1,525 @@
+// Global variables
+let terminal = null;
+let terminalSocket = null;
+let fitAddon = null;
+let refreshInterval = null;
+let refreshCountdown = 10;
+
+// Initialize on page load
+document.addEventListener('DOMContentLoaded', function() {
+    initializeTabs();
+    initializeAutoRefresh();
+    loadDashboard();
+});
+
+// ============================================================================
+// TAB MANAGEMENT
+// ============================================================================
+
+function initializeTabs() {
+    const tabButtons = document.querySelectorAll('.tab-btn');
+    
+    tabButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const tabName = this.getAttribute('data-tab');
+            switchTab(tabName);
+        });
+    });
+}
+
+function switchTab(tabName) {
+    // Update buttons
+    document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.classList.remove('active');
+    });
+    document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+    
+    // Update content
+    document.querySelectorAll('.tab-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    document.getElementById(`${tabName}-tab`).classList.add('active');
+    
+    // Load data for specific tabs
+    switch(tabName) {
+        case 'dashboard':
+            loadDashboard();
+            break;
+        case 'services':
+            loadServices();
+            break;
+        case 'network':
+            // Don't auto-load, wait for user to click
+            break;
+        case 'terminal':
+            if (!terminal) {
+                initializeTerminal();
+            }
+            break;
+    }
+}
+
+// ============================================================================
+// AUTO-REFRESH
+// ============================================================================
+
+function initializeAutoRefresh() {
+    refreshInterval = setInterval(() => {
+        refreshCountdown--;
+        document.getElementById('refresh-countdown').textContent = refreshCountdown;
+        
+        if (refreshCountdown <= 0) {
+            refreshCountdown = 10;
+            
+            // Only refresh if on dashboard tab
+            const activTab = document.querySelector('.tab-content.active');
+            if (activTab && activTab.id === 'dashboard-tab') {
+                loadDashboard();
+            }
+        }
+    }, 1000);
+}
+
+// ============================================================================
+// DASHBOARD
+// ============================================================================
+
+async function loadDashboard() {
+    try {
+        const response = await fetch('/api/dashboard');
+        const data = await response.json();
+        
+        if (data.success) {
+            updateSystemStats(data.system);
+            updateServiceStatus(data.services);
+            updateNetworkStatus(data.network);
+            updateHealthScore(data);
+        }
+    } catch (error) {
+        console.error('Error loading dashboard:', error);
+    }
+}
+
+function updateSystemStats(system) {
+    if (system.cpu) {
+        document.getElementById('cpu-usage').textContent = `${system.cpu.usage.toFixed(1)}%`;
+    }
+    
+    if (system.memory) {
+        document.getElementById('memory-usage').textContent = `${system.memory.percentage.toFixed(1)}%`;
+    }
+    
+    if (system.disk) {
+        document.getElementById('disk-usage').textContent = `${system.disk.percentage}%`;
+    }
+    
+    if (system.uptime) {
+        document.getElementById('uptime').textContent = system.uptime.uptime.replace('up ', '');
+    }
+}
+
+function updateServiceStatus(services) {
+    const container = document.getElementById('service-status');
+    container.innerHTML = '';
+    
+    for (const [name, status] of Object.entries(services.services)) {
+        const card = document.createElement('div');
+        card.className = 'service-card';
+        card.innerHTML = `
+            <div class="service-info">
+                <h4>${name}</h4>
+                <span class="service-status ${status.running ? 'running' : 'stopped'}">
+                    ${status.running ? '● Running' : '○ Stopped'}
+                </span>
+            </div>
+        `;
+        container.appendChild(card);
+    }
+}
+
+function updateNetworkStatus(network) {
+    const container = document.getElementById('network-status');
+    
+    if (network.details && network.details.public && network.details.public.ip) {
+        const ip = network.details.public.ip;
+        const udpPorts = network.details.public.udp || [];
+        const tcpPorts = network.details.public.tcp || [];
+        
+        container.innerHTML = `
+            <p><strong>External IP:</strong> ${ip}</p>
+            <p><strong>Public Access:</strong> ${network.publicAccessConfigured ? '✅ Configured' : '❌ Not configured'}</p>
+        `;
+    } else {
+        container.innerHTML = '<p>Network information unavailable</p>';
+    }
+}
+
+async function updateHealthScore(data) {
+    try {
+        const response = await fetch('/api/health');
+        const health = await response.json();
+        
+        if (health.success) {
+            document.getElementById('health-score').textContent = health.score;
+            
+            const statusBadge = document.getElementById('health-status');
+            statusBadge.textContent = health.status;
+            statusBadge.className = `status-badge ${health.status}`;
+        }
+    } catch (error) {
+        console.error('Error loading health:', error);
+    }
+}
+
+// ============================================================================
+// SERVICES
+// ============================================================================
+
+async function loadServices() {
+    try {
+        const response = await fetch('/api/services');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayServices(data.services);
+        }
+    } catch (error) {
+        console.error('Error loading services:', error);
+    }
+}
+
+function displayServices(services) {
+    const container = document.getElementById('services-list');
+    container.innerHTML = '';
+    
+    for (const [name, status] of Object.entries(services)) {
+        const item = document.createElement('div');
+        item.className = 'service-item';
+        item.innerHTML = `
+            <div class="service-header">
+                <div>
+                    <h3>${name}</h3>
+                    <span class="service-status ${status.running ? 'running' : 'stopped'}">
+                        ${status.running ? '● Running' : '○ Stopped'}
+                    </span>
+                </div>
+                <div class="service-actions">
+                    <button class="btn btn-primary" onclick="controlService('${name}', 'start')">Start</button>
+                    <button class="btn btn-danger" onclick="controlService('${name}', 'stop')">Stop</button>
+                    <button class="btn btn-secondary" onclick="controlService('${name}', 'restart')">Restart</button>
+                </div>
+            </div>
+            <pre style="color: var(--text-secondary); font-size: 12px; margin-top: 10px; max-height: 100px; overflow-y: auto;">${status.output.substring(0, 500)}</pre>
+        `;
+        container.appendChild(item);
+    }
+}
+
+async function controlService(name, action) {
+    if (!confirm(`Are you sure you want to ${action} ${name}?`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/services/${name}/${action}`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            alert(`${name} ${action} successful`);
+            await loadServices();
+        } else {
+            alert(`Error: ${data.error}`);
+        }
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+async function restartAllServices() {
+    if (!confirm('Are you sure you want to restart ALL services?')) {
+        return;
+    }
+    
+    try {
+        const response = await fetch('/api/services/restart-all', {
+            method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            alert('All services restarted');
+            await loadServices();
+        } else {
+            alert(`Error: ${data.error}`);
+        }
+    } catch (error) {
+        alert(`Error: ${error.message}`);
+    }
+}
+
+function refreshServices() {
+    loadServices();
+}
+
+// ============================================================================
+// LOGS
+// ============================================================================
+
+async function loadLogs() {
+    const service = document.getElementById('log-service').value;
+    const filter = document.getElementById('log-filter').value;
+    const container = document.getElementById('logs-output');
+    
+    container.innerHTML = '<p>Loading logs...</p>';
+    
+    try {
+        let url = `/api/logs/${service}?lines=100`;
+        if (filter) {
+            url += `&filter=${encodeURIComponent(filter)}`;
+        }
+        
+        const response = await fetch(url);
+        const data = await response.json();
+        
+        if (data.success && data.lines.length > 0) {
+            container.innerHTML = data.lines.join('\n');
+        } else {
+            container.innerHTML = '<p>No logs found</p>';
+        }
+    } catch (error) {
+        container.innerHTML = `<p style="color: var(--danger-color);">Error: ${error.message}</p>`;
+    }
+}
+
+async function findPubkey() {
+    if (!confirm('This will restart the pod service. Continue?')) {
+        return;
+    }
+    
+    const container = document.getElementById('logs-output');
+    container.innerHTML = '<p>Restarting pod and searching for pubkey...</p>';
+    
+    try {
+        const response = await fetch('/api/find-pubkey', {
+            method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            if (data.pubkey) {
+                container.innerHTML = `<p style="color: var(--success-color); font-size: 16px;"><strong>Pubkey Found:</strong> ${data.pubkey}</p>\n\n` + data.lines.join('\n');
+            } else {
+                container.innerHTML = '<p style="color: var(--warning-color);">Pubkey not found in recent logs</p>\n\n' + data.lines.join('\n');
+            }
+        } else {
+            container.innerHTML = `<p style="color: var(--danger-color);">Error: ${data.error}</p>`;
+        }
+    } catch (error) {
+        container.innerHTML = `<p style="color: var(--danger-color);">Error: ${error.message}</p>`;
+    }
+}
+
+// ============================================================================
+// pRPC API
+// ============================================================================
+
+async function callAPI(method) {
+    const container = document.getElementById('api-output');
+    container.innerHTML = '<p>Calling API...</p>';
+    
+    try {
+        const response = await fetch(`/api/prpc/${method}`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            container.innerHTML = `<pre>${JSON.stringify(data.result || data.raw, null, 2)}</pre>`;
+        } else {
+            container.innerHTML = `<p style="color: var(--danger-color);">Error: ${data.error}</p>`;
+        }
+    } catch (error) {
+        container.innerHTML = `<p style="color: var(--danger-color);">Error: ${error.message}</p>`;
+    }
+}
+
+async function callCustomAPI() {
+    const method = document.getElementById('custom-method').value.trim();
+    
+    if (!method) {
+        alert('Please enter a method name');
+        return;
+    }
+    
+    await callAPI(method);
+}
+
+// ============================================================================
+// NETWORK
+// ============================================================================
+
+async function runNetworkDiagnostics() {
+    const container = document.getElementById('network-output');
+    container.innerHTML = '<p>Running network diagnostics...</p>';
+    
+    try {
+        const response = await fetch('/api/network');
+        const data = await response.json();
+        
+        if (data.success) {
+            displayNetworkDiagnostics(data.diagnostics);
+        } else {
+            container.innerHTML = `<p style="color: var(--danger-color);">Error: ${data.error}</p>`;
+        }
+    } catch (error) {
+        container.innerHTML = `<p style="color: var(--danger-color);">Error: ${error.message}</p>`;
+    }
+}
+
+function displayNetworkDiagnostics(diagnostics) {
+    const container = document.getElementById('network-output');
+    
+    let html = '';
+    
+    // Localhost section
+    html += '<div class="network-section"><h4>Localhost Services</h4>';
+    for (const [port, status] of Object.entries(diagnostics.localhost)) {
+        const icon = status.listening ? '✅' : '❌';
+        html += `<div class="port-status"><span class="icon">${icon}</span> TCP ${port} ${status.listening ? 'LISTENING' : 'NOT LISTENING'}</div>`;
+    }
+    html += '</div>';
+    
+    // Public section
+    if (diagnostics.public.ip) {
+        html += `<div class="network-section"><h4>Public Access (${diagnostics.public.ip})</h4>`;
+        
+        diagnostics.public.udp.forEach(port => {
+            const icon = port.accessible ? '✅' : '❌';
+            html += `<div class="port-status"><span class="icon">${icon}</span> UDP ${port.port} ${port.accessible ? 'PUBLIC' : 'NOT PUBLIC'}</div>`;
+        });
+        
+        diagnostics.public.tcp.forEach(port => {
+            const icon = port.accessible ? '✅' : '❌';
+            html += `<div class="port-status"><span class="icon">${icon}</span> TCP ${port.port} ${port.accessible ? 'PUBLIC' : 'NOT PUBLIC'}</div>`;
+        });
+        
+        html += '</div>';
+    } else {
+        html += '<div class="network-section"><p style="color: var(--warning-color);">Could not determine external IP</p></div>';
+    }
+    
+    container.innerHTML = html;
+}
+
+// ============================================================================
+// TERMINAL
+// ============================================================================
+
+function initializeTerminal() {
+    terminal = new Terminal({
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily: 'Menlo, Monaco, "Courier New", monospace',
+        theme: {
+            background: '#0f172a',
+            foreground: '#e2e8f0',
+            cursor: '#6366f1'
+        }
+    });
+    
+    fitAddon = new FitAddon.FitAddon();
+    terminal.loadAddon(fitAddon);
+    
+    terminal.open(document.getElementById('terminal-container'));
+    fitAddon.fit();
+    
+    connectTerminalWebSocket();
+    
+    // Handle window resize
+    window.addEventListener('resize', () => {
+        if (fitAddon) {
+            fitAddon.fit();
+        }
+    });
+}
+
+function connectTerminalWebSocket() {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsUrl = `${protocol}//${window.location.host}/terminal`;
+    
+    terminalSocket = new WebSocket(wsUrl);
+    
+    terminalSocket.onopen = () => {
+        terminal.write('\x1b[32mConnected to terminal\x1b[0m\r\n');
+        
+        // Send data from terminal to WebSocket
+        terminal.onData(data => {
+            if (terminalSocket.readyState === WebSocket.OPEN) {
+                terminalSocket.send(JSON.stringify({
+                    type: 'input',
+                    data: data
+                }));
+            }
+        });
+        
+        // Handle terminal resize
+        terminal.onResize(({ cols, rows }) => {
+            if (terminalSocket.readyState === WebSocket.OPEN) {
+                terminalSocket.send(JSON.stringify({
+                    type: 'resize',
+                    cols: cols,
+                    rows: rows
+                }));
+            }
+        });
+    };
+    
+    terminalSocket.onmessage = (event) => {
+        terminal.write(event.data);
+    };
+    
+    terminalSocket.onerror = (error) => {
+        terminal.write('\r\n\x1b[31mWebSocket error occurred\x1b[0m\r\n');
+    };
+    
+    terminalSocket.onclose = () => {
+        terminal.write('\r\n\x1b[31mDisconnected from terminal\x1b[0m\r\n');
+    };
+}
+
+function sendQuickCommand(command) {
+    if (!terminal || !terminalSocket || terminalSocket.readyState !== WebSocket.OPEN) {
+        alert('Terminal not connected');
+        return;
+    }
+    
+    // Send the command
+    for (let i = 0; i < command.length; i++) {
+        terminalSocket.send(JSON.stringify({
+            type: 'input',
+            data: command.charAt(i)
+        }));
+    }
+    
+    // Send Enter key
+    terminalSocket.send(JSON.stringify({
+        type: 'input',
+        data: '\r'
+    }));
+}
+
+function reconnectTerminal() {
+    if (terminalSocket) {
+        terminalSocket.close();
+    }
+    
+    if (terminal) {
+        terminal.clear();
+    }
+    
+    setTimeout(() => {
+        connectTerminalWebSocket();
+    }, 500);
+}
