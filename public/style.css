@@ -121,7 +121,7 @@ body {
     background: var(--card-bg);
     border-radius: 12px;
     padding: 30px;
-    min-height: 500px;
+    min-height: calc(100vh - 420px);
     box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 
@@ -322,7 +322,7 @@ h3 {
     padding: 20px;
     font-family: 'Courier New', monospace;
     font-size: 13px;
-    max-height: 500px;
+    max-height: calc(100vh - 420px);
     overflow-y: auto;
     white-space: pre-wrap;
     word-wrap: break-word;
@@ -394,8 +394,8 @@ h3 {
     border: 2px solid var(--border-color);
     border-radius: 8px;
     padding: 10px;
-    height: 500px;
-    overflow: hidden;
+    height: calc(100vh - 420px);
+    overflow: visible;
 }
 
 .terminal-warning {

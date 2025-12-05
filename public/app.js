@@ -54,6 +54,13 @@ function switchTab(tabName) {
         case 'terminal':
             if (!terminal) {
                 initializeTerminal();
+            } else {
+                // Re-fit terminal when switching to tab
+                setTimeout(() => {
+                    if (fitAddon) {
+                        fitAddon.fit();
+                    }
+                }, 100);
             }
             break;
     }
