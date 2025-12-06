@@ -164,8 +164,17 @@
                     <input type="text" id="custom-method" placeholder="Method name (e.g., get-balance)">
                     <button class="btn btn-secondary" onclick="callCustomAPI()">Call</button>
                 </div>
-                <div id="api-output" class="api-container">
-                    <p>Click a button to make an API call</p>
+                <div class="api-split">
+                    <div class="api-pane">
+                        <h4>Call Format</h4>
+                        <pre id="api-format" class="api-container" style="min-height: 200px;">Select a method to see payload...</pre>
+                    </div>
+                    <div class="api-pane">
+                        <h4>Response</h4>
+                        <div id="api-output" class="api-container">
+                            <p>Click a button to make an API call</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -227,6 +236,6 @@
         </footer>
     </div>
 
-    <script src="app.js"></script>
+    <script src="app.js?v=1765043135"></script>
 </body>
 </html>

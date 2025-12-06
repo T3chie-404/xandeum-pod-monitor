@@ -611,3 +611,14 @@ h3 {
 .service-item pre {
     max-height: 170px;
 }
+
+
+.api-split {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.api-pane {
+    flex: 1;
+    min-width: 280px;
+}

@@ -17,11 +17,36 @@ const state = {
     }
 };
 
+
+function loadMetricsCache() {
+    try {
+        const raw = localStorage.getItem('xpm_metrics');
+        if (!raw) return;
+        const parsed = JSON.parse(raw);
+        const cutoff = Date.now() - (24 * 60 * 60 * 1000);
+        ['cpu','memory','disk','credits'].forEach(k => {
+            const arr = Array.isArray(parsed[k]) ? parsed[k].filter(p => p.t >= cutoff) : [];
+            state.metrics[k] = arr;
+        });
+    } catch (e) {
+        console.warn('metrics cache load failed', e);
+    }
+}
+
+function saveMetricsCache() {
+    try {
+        localStorage.setItem('xpm_metrics', JSON.stringify(state.metrics));
+    } catch (e) {
+        console.warn('metrics cache save failed', e);
+    }
+}
+
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     initializeTabs();
     initializeAutoRefresh();
     initReadOnlyToggle();
+    loadMetricsCache();
     loadDashboard();
 });
 
@@ -66,6 +91,7 @@ function switchTab(tabName) {
             break;
         case 'graphs':
             renderCharts();
+    saveMetricsCache();
             break;
         case 'terminal':
             if (guardDangerous()) {
@@ -268,7 +294,7 @@ async function loadDashboardCredits() {
         const earnedEl = document.getElementById('credits-earned');
         const maxEl = document.getElementById('credits-max');
         if (earnedEl) earnedEl.textContent = data.localCredits !== null && data.localCredits !== undefined ? data.localCredits.toFixed(0) : '--';
-        if (maxEl) maxEl.textContent = data.percentile95 !== null && data.percentile95 !== undefined ? data.percentile95.toFixed(0) : '--';
+        if (maxEl) maxEl.textContent = data.maxCredits !== null && data.maxCredits !== undefined ? data.maxCredits.toFixed(0) : '--';
 
         renderEligibilityOutput(data);
         return { localCredits: data.localCredits, maxCredits: data.maxCredits };
@@ -437,6 +463,14 @@ function toggleHealthFormula(forceHide = false) {
     modal.classList.toggle('hidden');
 }
 
+
+function updateAPIFormat(method, params = {}) {
+    const el = document.getElementById('api-format');
+    if (!el) return;
+    const payload = { method, params };
+    el.textContent = JSON.stringify(payload, null, 2);
+}
+
 // ============================================================================
 // SERVICES
 // ============================================================================
@@ -598,6 +632,7 @@ async function findPubkey() {
 
 async function callAPI(method) {
     const container = document.getElementById('api-output');
+    updateAPIFormat(method, {});
     container.innerHTML = '<p>Calling API...</p>';
     
     try {
@@ -623,7 +658,7 @@ async function callCustomAPI() {
         alert('Please enter a method name');
         return;
     }
-    
+    updateAPIFormat(method, {});
     await callAPI(method);
 }
 
