@@ -15,7 +15,8 @@ const state = {
         disk: [],
         credits: []
     },
-    cachedIP: null
+    cachedIP: null,
+    logLines: 100
 };
 
 
@@ -446,7 +447,7 @@ async function checkEligibility() {
             </div>
             <div class="eligibility-row">
                 <span class="eligibility-label">Eligible for DevNet:</span>
-                <span class="eligibility-value ${data.eligible ? 'success' : 'danger'}">${data.eligible !== null ? (data.eligible ? 'YES ✓' : 'NO ✗') : 'Unknown'}</span>
+                <span class="eligibility-value">Unknown (criteria TBD)</span>
             </div>
             <div class="eligibility-row">
                 <span class="eligibility-label">Total Pods:</span>
@@ -483,7 +484,7 @@ function renderEligibilityOutput(data) {
     if (data.threshold !== null && data.threshold !== undefined) parts.push(`Threshold (80% of P95): ${data.threshold}`);
     if (data.maxCredits !== null && data.maxCredits !== undefined) parts.push(`Top earner: ${data.maxCredits}`);
     if (data.percentile95 !== null && data.percentile95 !== undefined) parts.push(`P95 earner: ${data.percentile95}`);
-    if (data.eligible !== null && data.eligible !== undefined) parts.push(`Eligible: ${data.eligible ? 'Yes' : 'No'}`);
+    parts.push(`DevNet Status: Unknown (criteria TBD)`);
     out.textContent = parts.join(' | ');
 }
 
@@ -790,6 +791,14 @@ function togglePubkeyButton() {
 // LOGS
 // ============================================================================
 
+
+function setLogLines(lines) {
+    state.logLines = lines;
+    document.querySelectorAll('.log-line-btn').forEach(btn => {
+        btn.classList.toggle('active', parseInt(btn.getAttribute('data-lines')) === lines);
+    });
+}
+
 async function loadLogs() {
     const service = document.getElementById('log-service').value;
     const filter = document.getElementById('log-filter').value;
@@ -798,7 +807,7 @@ async function loadLogs() {
     container.innerHTML = '<p>Loading logs...</p>';
     
     try {
-        let url = `/api/logs/${service}?lines=5000`;
+        let url = `/api/logs/${service}?lines=${state.logLines}`;
         if (filter) {
             url += `&filter=${encodeURIComponent(filter)}`;
         }

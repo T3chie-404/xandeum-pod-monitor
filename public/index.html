@@ -76,12 +76,12 @@
                     </div>
                     <div class="card">
                         <h3>Earned Credits</h3>
-                        <div class="stat-value" id="credits-earned">Loading...</div>
+                        <div class="stat-value" id="credits-earned">--</div>
                         <div class="stat-label">My pod</div>
                     </div>
                     <div class="card">
                         <h3>Top Earner</h3>
-                        <div class="stat-value" id="credits-max">Loading...</div>
+                        <div class="stat-value" id="credits-max">--</div>
                         <div class="stat-label">Highest credits (max)</div>
                     </div>
                 </div>
@@ -142,6 +142,12 @@
                         <option value="xandminerd">xandminerd</option>
                         <option value="xandeum-pod-monitor">xandeum-pod-monitor</option>
                     </select>
+                    <div class="log-lines-selector">
+                        <button class="log-line-btn active" data-lines="100" onclick="setLogLines(100)">100</button>
+                        <button class="log-line-btn" data-lines="2000" onclick="setLogLines(2000)">2k</button>
+                        <button class="log-line-btn" data-lines="10000" onclick="setLogLines(10000)">10k</button>
+                        <button class="log-line-btn" data-lines="20000" onclick="setLogLines(20000)">20k</button>
+                    </div>
                     <input type="text" id="log-filter" placeholder="Filter logs (e.g., 'error', 'pubkey')">
                     <button class="btn btn-primary" onclick="loadLogs()">Load Logs</button>
                     <button class="btn btn-secondary" id="find-pubkey-btn" style="display:none;" onclick="findPubkey()">Find Pubkey (grep logs)</button>
@@ -233,9 +239,13 @@
                 <h3>Health Score Formula</h3>
                 <p><strong>Overall score = 40% System + 60% Services.</strong></p>
                 <ul>
-                    <li>System score: CPU, Memory, Disk thresholds (90% high, 70-80% warning).</li>
-                    <li>Service score: percent of running services.</li>
-                    <li>Status badge: Healthy ≥80, Warning ≥50, Critical &lt;50.</li>
+                    <li>System score starts at 100, reduces based on resource usage</li>
+                    <li>CPU: -20 if ≥91%, -10 if ≥71%</li>
+                    <li>Memory: -20 if ≥91%, -10 if ≥76%</li>
+                    <li>Disk: -30 if ≥91%, -15 if ≥81%</li>
+                    <li>Service score: (running services / total) × 100</li>
+                    <li>Overall = (System × 0.4) + (Services × 0.6)</li>
+                    <li>Status: Healthy ≥80, Warning ≥50, Critical &lt;50</li>
                 </ul>
                 <button class="btn btn-secondary" onclick="toggleHealthFormula(true)">Close</button>
             </div>
@@ -247,6 +257,6 @@
         </footer>
     </div>
 
-    <script src="app.js?v=1765054695"></script>
+    <script src="app.js?v=1765055856"></script>
 </body>
 </html>

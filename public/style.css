@@ -683,3 +683,30 @@ h3 {
     color: var(--text-secondary);
     z-index: 10;
 }
+
+/* Log lines selector */
+.log-lines-selector {
+    display: flex;
+    gap: 4px;
+}
+
+.log-line-btn {
+    padding: 8px 14px;
+    border: 1px solid var(--border-color);
+    background: var(--bg-color);
+    color: var(--text-secondary);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s;
+}
+
+.log-line-btn:hover {
+    border-color: var(--primary-color);
+}
+
+.log-line-btn.active {
+    background: var(--primary-color);
+    border-color: var(--primary-color);
+    color: white;
+}
