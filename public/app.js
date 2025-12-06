@@ -467,8 +467,31 @@ function toggleHealthFormula(forceHide = false) {
 function updateAPIFormat(method, params = {}) {
     const el = document.getElementById('api-format');
     if (!el) return;
-    const payload = { method, params };
-    el.textContent = JSON.stringify(payload, null, 2);
+    const payload = {
+        "jsonrpc": "2.0",
+        "method": method,
+        "id": 1
+    };
+    if (Object.keys(params).length > 0) {
+        payload.params = params;
+    }
+    
+    // Fetch external IP for curl command (or use placeholder)
+    fetch('/api/network')
+        .then(res => res.json())
+        .then(data => {
+            const ip = data.diagnostics?.public?.ip || 'YOUR_PUBLIC_IP';
+            const curlCmd = `curl -X POST http://${ip}:6000/rpc \\
+  -H "Content-Type: application/json" \\
+  -d '${JSON.stringify(payload, null, 2)}'`;
+            el.textContent = curlCmd;
+        })
+        .catch(() => {
+            const curlCmd = `curl -X POST http://YOUR_PUBLIC_IP:6000/rpc \\
+  -H "Content-Type: application/json" \\
+  -d '${JSON.stringify(payload, null, 2)}'`;
+            el.textContent = curlCmd;
+        });
 }
 
 // ============================================================================
