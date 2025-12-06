@@ -600,7 +600,7 @@ h3 {
     background: var(--bg-color);
     border: 2px solid var(--border-color);
     border-radius: 8px;
-    padding: 10px;
+    padding: 28px 10px 10px 10px;
 }
 
 /* Services: taller cards */
@@ -621,4 +621,65 @@ h3 {
 .api-pane {
     flex: 1;
     min-width: 280px;
+}
+
+/* Eligibility modal */
+.eligibility-card {
+    max-width: 600px;
+}
+
+.eligibility-details {
+    background: var(--bg-color);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 20px;
+    margin: 15px 0;
+}
+
+.eligibility-details h4 {
+    color: var(--primary-color);
+    margin-bottom: 10px;
+}
+
+.eligibility-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.eligibility-row:last-child {
+    border-bottom: none;
+}
+
+.eligibility-label {
+    color: var(--text-secondary);
+}
+
+.eligibility-value {
+    font-weight: 600;
+    color: var(--text-color);
+}
+
+.eligibility-value.success {
+    color: var(--success-color);
+}
+
+.eligibility-value.danger {
+    color: var(--danger-color);
+}
+
+/* Graph titles */
+.graph-card {
+    position: relative;
+}
+
+.graph-title {
+    position: absolute;
+    top: 8px;
+    left: 12px;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    z-index: 10;
 }

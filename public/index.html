@@ -144,7 +144,7 @@
                     </select>
                     <input type="text" id="log-filter" placeholder="Filter logs (e.g., 'error', 'pubkey')">
                     <button class="btn btn-primary" onclick="loadLogs()">Load Logs</button>
-                    <button class="btn btn-secondary" data-protected="true" onclick="findPubkey()">Find Pubkey</button>
+                    <button class="btn btn-secondary" id="find-pubkey-btn" style="display:none;" onclick="findPubkey()">Find Pubkey (grep logs)</button>
                 </div>
                 <div id="logs-output" class="logs-container">
                     <p>Select a service and click "Load Logs"</p>
@@ -191,15 +191,15 @@
             <div id="graphs-tab" class="tab-content">
                 <h2>Graphs</h2>
                 <div class="graph-controls">
-                    <button class="btn btn-secondary" data-range="10m" onclick="setGraphRange("10m")">10m</button>
-                    <button class="btn btn-secondary" data-range="6h" onclick="setGraphRange("6h")">6h</button>
-                    <button class="btn btn-secondary" data-range="24h" onclick="setGraphRange("24h")">24h</button>
+                    <button class="btn btn-primary" data-range="10m" onclick="setGraphRange('10m')">10m</button>
+                    <button class="btn btn-secondary" data-range="6h" onclick="setGraphRange('6h')">6h</button>
+                    <button class="btn btn-secondary" data-range="24h" onclick="setGraphRange('24h')">24h</button>
                 </div>
                 <div class="graphs-grid">
-                    <div class="graph-card"><canvas id="chart-cpu"></canvas></div>
-                    <div class="graph-card"><canvas id="chart-memory"></canvas></div>
-                    <div class="graph-card"><canvas id="chart-disk"></canvas></div>
-                    <div class="graph-card"><canvas id="chart-credits"></canvas></div>
+                    <div class="graph-card"><div class="graph-title">CPU</div><canvas id="chart-cpu"></canvas></div>
+                    <div class="graph-card"><div class="graph-title">RAM</div><canvas id="chart-memory"></canvas></div>
+                    <div class="graph-card"><div class="graph-title">DISK</div><canvas id="chart-disk"></canvas></div>
+                    <div class="graph-card"><div class="graph-title">CREDITS</div><canvas id="chart-credits"></canvas></div>
                 </div>
             </div>
 
@@ -213,6 +213,17 @@
                 <div class="terminal-warning">
                     <strong>⚠️ Warning:</strong> This is a real terminal. Read-Only mode blocks commands.<br><strong>Note:</strong> Running installer scripts here can break the session; use SSH for installs.
                 </div>
+            </div>
+        </div>
+
+        <!-- Eligibility Modal -->
+        <div id="eligibility-modal" class="modal hidden">
+            <div class="modal-content eligibility-card">
+                <h3>DevNet Incentive Eligibility</h3>
+                <div id="eligibility-details" class="eligibility-details">
+                    <p>Loading...</p>
+                </div>
+                <button class="btn btn-secondary" onclick="toggleEligibilityModal(true)">Close</button>
             </div>
         </div>
 
@@ -232,10 +243,10 @@
 
         <!-- Footer -->
         <footer class="footer">
-            <p>Xandeum Pod Monitor v1.0.0 | <a href="https://docs.xandeum.network" target="_blank">Documentation</a> | Auto-refresh: <span id="refresh-countdown">10</span>s</p>
+            <p>Xandeum Pod Monitor v1.0.0 | <a href="https://github.com/T3chie-404/xandeum-pod-monitor" target="_blank">GitHub</a> | Auto-refresh: <span id="refresh-countdown">10</span>s</p>
         </footer>
     </div>
 
-    <script src="app.js?v=1765053017"></script>
+    <script src="app.js?v=1765054695"></script>
 </body>
 </html>

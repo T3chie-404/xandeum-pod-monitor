@@ -26,11 +26,18 @@ function loadMetricsCache() {
             console.log('No metrics cache found, starting fresh');
         } else {
             const parsed = JSON.parse(raw);
-            const cutoff = Date.now() - (24 * 60 * 60 * 1000);
-            ['cpu','memory','disk','credits'].forEach(k => {
-                const arr = Array.isArray(parsed[k]) ? parsed[k].filter(p => p.t >= cutoff) : [];
+            const cutoffMetrics = Date.now() - (24 * 60 * 60 * 1000);
+            const cutoffCredits = Date.now() - (40 * 24 * 60 * 60 * 1000);
+            
+            ['cpu','memory','disk'].forEach(k => {
+                const arr = Array.isArray(parsed[k]) ? parsed[k].filter(p => p.t >= cutoffMetrics) : [];
                 state.metrics[k] = arr;
             });
+            
+            // Credits: 40 day retention
+            const creditsArr = Array.isArray(parsed['credits']) ? parsed['credits'].filter(p => p.t >= cutoffCredits) : [];
+            state.metrics['credits'] = creditsArr;
+            
             console.log('Loaded metrics cache:', {
                 cpu: state.metrics.cpu.length,
                 mem: state.metrics.memory.length,
@@ -65,6 +72,13 @@ document.addEventListener('DOMContentLoaded', function() {
     initReadOnlyToggle();
     loadMetricsCache();
     loadDashboard();
+    
+    // Setup log service selector
+    const logService = document.getElementById('log-service');
+    if (logService) {
+        logService.addEventListener('change', togglePubkeyButton);
+        togglePubkeyButton();
+    }
 });
 
 // ============================================================================
@@ -392,10 +406,68 @@ async function forcePubkeyScan() {
 }
 
 async function checkEligibility() {
-    const result = await loadDashboardCredits();
-    if (result.localCredits === null) {
-        alert('Unable to determine eligibility yet.');
+    const modal = document.getElementById('eligibility-modal');
+    const details = document.getElementById('eligibility-details');
+    if (!modal || !details) return;
+    
+    modal.classList.remove('hidden');
+    details.innerHTML = '<p>Loading eligibility data...</p>';
+    
+    try {
+        const response = await fetch('/api/devnet-eligibility');
+        const data = await response.json();
+        
+        if (!data.success) {
+            details.innerHTML = '<p style="color: var(--danger-color);">Failed to load eligibility data.</p>';
+            return;
+        }
+        
+        const html = `
+            <h4>Formula: 95th Percentile × 80% Threshold</h4>
+            <div class="eligibility-row">
+                <span class="eligibility-label">Your Pubkey:</span>
+                <span class="eligibility-value">${data.pubkey || 'Not found'}</span>
+            </div>
+            <div class="eligibility-row">
+                <span class="eligibility-label">Your Credits:</span>
+                <span class="eligibility-value ${data.localCredits ? 'success' : ''}">${data.localCredits !== null ? data.localCredits : '--'}</span>
+            </div>
+            <div class="eligibility-row">
+                <span class="eligibility-label">Top Earner:</span>
+                <span class="eligibility-value">${data.maxCredits !== null ? data.maxCredits : '--'}</span>
+            </div>
+            <div class="eligibility-row">
+                <span class="eligibility-label">95th Percentile:</span>
+                <span class="eligibility-value">${data.percentile95 !== null ? data.percentile95 : '--'}</span>
+            </div>
+            <div class="eligibility-row">
+                <span class="eligibility-label">Threshold (80% of P95):</span>
+                <span class="eligibility-value">${data.threshold !== null ? data.threshold : '--'}</span>
+            </div>
+            <div class="eligibility-row">
+                <span class="eligibility-label">Eligible for DevNet:</span>
+                <span class="eligibility-value ${data.eligible ? 'success' : 'danger'}">${data.eligible !== null ? (data.eligible ? 'YES ✓' : 'NO ✗') : 'Unknown'}</span>
+            </div>
+            <div class="eligibility-row">
+                <span class="eligibility-label">Total Pods:</span>
+                <span class="eligibility-value">${data.totalPods || '--'}</span>
+            </div>
+        `;
+        
+        details.innerHTML = html;
+    } catch (error) {
+        details.innerHTML = `<p style="color: var(--danger-color);">Error: ${error.message}</p>`;
     }
+}
+
+function toggleEligibilityModal(forceHide = false) {
+    const modal = document.getElementById('eligibility-modal');
+    if (!modal) return;
+    if (forceHide) {
+        modal.classList.add('hidden');
+        return;
+    }
+    modal.classList.toggle('hidden');
 }
 
 function renderEligibilityOutput(data) {
@@ -513,19 +585,37 @@ function renderCharts() {
     const charts = state.charts;
     if (!charts.cpu) return;
     updateGraphRangeButtons();
+    
+    // Credits uses 40-day window, others use selected range
+    const cutoffCredits = Date.now() - (40 * 24 * 60 * 60 * 1000);
+    const creditsData = state.metrics.credits.filter(p => p.t >= cutoffCredits);
+    
     const datasets = [
         { chart: charts.cpu, data: filterByRange(state.metrics.cpu) },
         { chart: charts.memory, data: filterByRange(state.metrics.memory) },
         { chart: charts.disk, data: filterByRange(state.metrics.disk) },
-        { chart: charts.credits, data: filterByRange(state.metrics.credits) },
+        { chart: charts.credits, data: creditsData },
     ];
-    datasets.forEach(({ chart, data }) => {
-        chart.data.labels = data.map((_, idx) => {
-            if (data.length === 1) return state.graphsRange === "10m" ? "-10m" : "now";
-            if (idx === 0) return "-" + state.graphsRange;
-            if (idx === data.length - 1) return "now";
-            return "";
-        });
+    datasets.forEach(({ chart, data }, idx) => {
+        // Credits chart: show days of history
+        if (idx === 3 && data.length > 0) {
+            const oldestTs = data[0].t;
+            const ageMs = Date.now() - oldestTs;
+            const ageDays = (ageMs / (24 * 60 * 60 * 1000)).toFixed(1);
+            chart.data.labels = data.map((_, i) => {
+                if (i === 0) return `-${ageDays}d`;
+                if (i === data.length - 1) return "now";
+                return "";
+            });
+        } else {
+            // Other charts: use range selector
+            chart.data.labels = data.map((_, i) => {
+                if (data.length === 1) return state.graphsRange === "10m" ? "-10m" : "now";
+                if (i === 0) return "-" + state.graphsRange;
+                if (i === data.length - 1) return "now";
+                return "";
+            });
+        }
         chart.data.datasets[0].data = data.map(d => d.v);
         chart.update('none');
     });
@@ -687,6 +777,15 @@ function refreshServices() {
     loadServices();
 }
 
+
+function togglePubkeyButton() {
+    const service = document.getElementById('log-service').value;
+    const btn = document.getElementById('find-pubkey-btn');
+    if (btn) {
+        btn.style.display = service === 'pod' ? 'inline-block' : 'none';
+    }
+}
+
 // ============================================================================
 // LOGS
 // ============================================================================
@@ -699,7 +798,7 @@ async function loadLogs() {
     container.innerHTML = '<p>Loading logs...</p>';
     
     try {
-        let url = `/api/logs/${service}?lines=100`;
+        let url = `/api/logs/${service}?lines=5000`;
         if (filter) {
             url += `&filter=${encodeURIComponent(filter)}`;
         }
@@ -718,25 +817,19 @@ async function loadLogs() {
 }
 
 async function findPubkey() {
-    if (guardDangerous()) return;
-    if (!confirm('This will restart the pod service. Continue?')) {
-        return;
-    }
-    
     const container = document.getElementById('logs-output');
-    container.innerHTML = '<p>Restarting pod and searching for pubkey...</p>';
+    container.innerHTML = '<p>Scanning pod logs for pubkey (20,000 lines)...</p>';
     
     try {
-        const response = await fetch('/api/find-pubkey', {
-            method: 'POST'
-        });
+        const response = await fetch('/api/pod-pubkey');
         const data = await response.json();
         
         if (data.success) {
             if (data.pubkey) {
-                container.innerHTML = `<p style="color: var(--success-color); font-size: 16px;"><strong>Pubkey Found:</strong> ${data.pubkey}</p>\n\n` + data.lines.join('\n');
+                const cached = data.cached ? ' (from cache)' : '';
+                container.innerHTML = `<p style="color: var(--success-color); font-size: 16px;"><strong>Pubkey Found${cached}:</strong> ${data.pubkey}</p>\n\n` + (data.lines.length > 0 ? data.lines.join('\n') : 'Retrieved from cache.');
             } else {
-                container.innerHTML = '<p style="color: var(--warning-color);">Pubkey not found in recent logs</p>\n\n' + data.lines.join('\n');
+                container.innerHTML = '<p style="color: var(--warning-color);">Pubkey not found in logs. Try restarting pod service via Services tab.</p>';
             }
         } else {
             container.innerHTML = `<p style="color: var(--danger-color);">Error: ${data.error}</p>`;
@@ -745,6 +838,7 @@ async function findPubkey() {
         container.innerHTML = `<p style="color: var(--danger-color);">Error: ${error.message}</p>`;
     }
 }
+
 
 // ============================================================================
 // pRPC API
