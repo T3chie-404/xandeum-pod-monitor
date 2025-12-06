@@ -24,7 +24,7 @@ const wss = new WebSocket.Server({ server });
 // Initialize Terminal Manager
 
 // Middleware
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
 app.use(express.static("public"));
 
 // Rate limiting (simple in-memory implementation)
@@ -158,6 +158,9 @@ app.get("/api/logs/:service", async (req, res) => {
   try {
     const lines = parseInt(req.query.lines) || 50;
     const filter = req.query.filter || null;
+    
+    // Set longer timeout for large log requests
+    req.setTimeout(30000); // 30 seconds
     
     const logs = await LogManager.getLogs(req.params.service, lines, filter);
     res.json(logs);

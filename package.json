@@ -14,7 +14,7 @@
     "dashboard"
   ],
   "author": "T3chie-404",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "dependencies": {
     "express": "^4.18.2",
     "ws": "^8.14.2",

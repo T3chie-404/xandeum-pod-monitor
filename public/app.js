@@ -812,16 +812,28 @@ async function loadLogs() {
             url += `&filter=${encodeURIComponent(filter)}`;
         }
         
-        const response = await fetch(url);
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 15000);
+        
+        const response = await fetch(url, { signal: controller.signal });
+        clearTimeout(timeout);
         const data = await response.json();
+        
+        console.log('Logs response:', { success: data.success, count: data.lines?.length, service });
         
         if (data.success && data.lines.length > 0) {
             container.innerHTML = data.lines.join('\n');
+        } else if (data.success) {
+            container.innerHTML = '<p>No logs found (empty response)</p>';
         } else {
-            container.innerHTML = '<p>No logs found</p>';
+            container.innerHTML = `<p style="color: var(--danger-color);">Error: ${data.error}</p>`;
         }
     } catch (error) {
-        container.innerHTML = `<p style="color: var(--danger-color);">Error: ${error.message}</p>`;
+        if (error.name === 'AbortError') {
+            container.innerHTML = '<p style="color: var(--danger-color);">Request timeout (>15s). Try fewer lines.</p>';
+        } else {
+            container.innerHTML = `<p style="color: var(--danger-color);">Error: ${error.message}</p>`;
+        }
     }
 }
 
@@ -910,26 +922,37 @@ async function runNetworkDiagnostics() {
 function displayNetworkDiagnostics(diagnostics) {
     const container = document.getElementById('network-output');
     
-    let html = '';
+    let html = '<p style="color: var(--text-secondary); margin-bottom: 15px; font-size: 13px;"><strong>Note:</strong> Ports listening on server. Firewall rules and port forwarding (if behind router) still required for external access.</p>';
     
-    // Localhost section
+    // Localhost section - sort by port number
     html += '<div class="network-section"><h4>Localhost Services</h4>';
-    for (const [port, status] of Object.entries(diagnostics.localhost)) {
+    const localPorts = Object.entries(diagnostics.localhost).sort((a, b) => parseInt(a[0]) - parseInt(b[0]));
+    localPorts.forEach(([port, status]) => {
         const icon = status.listening ? '✅' : '❌';
-        html += `<div class="port-status"><span class="icon">${icon}</span> TCP ${port} ${status.listening ? 'LISTENING' : 'NOT LISTENING'}</div>`;
-    }
+        const scope = status.isPublic ? ' (0.0.0.0 - PUBLIC + LOCALHOST)' : ' (127.0.0.1)';
+        html += `<div class="port-status"><span class="icon">${icon}</span> TCP ${port}${status.listening ? scope : ''} ${status.listening ? 'LISTENING' : 'NOT LISTENING'}</div>`;
+    });
     html += '</div>';
     
     // Public section
     if (diagnostics.public.ip) {
         html += `<div class="network-section"><h4>Public Access (${diagnostics.public.ip})</h4>`;
         
-        diagnostics.public.udp.forEach(port => {
+        // Sort UDP ports
+        const udpSorted = diagnostics.public.udp.sort((a, b) => a.port - b.port);
+        udpSorted.forEach(port => {
             const icon = port.accessible ? '✅' : '❌';
             html += `<div class="port-status"><span class="icon">${icon}</span> UDP ${port.port} ${port.accessible ? 'PUBLIC' : 'NOT PUBLIC'}</div>`;
         });
         
-        diagnostics.public.tcp.forEach(port => {
+        // Divider between UDP and TCP
+        if (udpSorted.length > 0 && diagnostics.public.tcp.length > 0) {
+            html += '<hr style="margin: 12px 0; border: 0; border-top: 1px solid var(--border-color);">';
+        }
+        
+        // Sort TCP ports
+        const tcpSorted = diagnostics.public.tcp.sort((a, b) => a.port - b.port);
+        tcpSorted.forEach(port => {
             const icon = port.accessible ? '✅' : '❌';
             html += `<div class="port-status"><span class="icon">${icon}</span> TCP ${port.port} ${port.accessible ? 'PUBLIC' : 'NOT PUBLIC'}</div>`;
         });
@@ -941,6 +964,8 @@ function displayNetworkDiagnostics(diagnostics) {
     
     container.innerHTML = html;
 }
+
+
 
 // ============================================================================
 // TERMINAL
