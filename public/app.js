@@ -14,22 +14,39 @@ const state = {
         memory: [],
         disk: [],
         credits: []
-    }
+    },
+    cachedIP: null
 };
 
 
 function loadMetricsCache() {
     try {
         const raw = localStorage.getItem('xpm_metrics');
-        if (!raw) return;
-        const parsed = JSON.parse(raw);
-        const cutoff = Date.now() - (24 * 60 * 60 * 1000);
-        ['cpu','memory','disk','credits'].forEach(k => {
-            const arr = Array.isArray(parsed[k]) ? parsed[k].filter(p => p.t >= cutoff) : [];
-            state.metrics[k] = arr;
-        });
+        if (!raw) {
+            console.log('No metrics cache found, starting fresh');
+        } else {
+            const parsed = JSON.parse(raw);
+            const cutoff = Date.now() - (24 * 60 * 60 * 1000);
+            ['cpu','memory','disk','credits'].forEach(k => {
+                const arr = Array.isArray(parsed[k]) ? parsed[k].filter(p => p.t >= cutoff) : [];
+                state.metrics[k] = arr;
+            });
+            console.log('Loaded metrics cache:', {
+                cpu: state.metrics.cpu.length,
+                mem: state.metrics.memory.length,
+                disk: state.metrics.disk.length,
+                credits: state.metrics.credits.length
+            });
+        }
+        
+        // Load cached IP
+        const cachedIP = localStorage.getItem('xpm_ip');
+        if (cachedIP) {
+            state.cachedIP = cachedIP;
+            console.log('Loaded cached IP:', cachedIP);
+        }
     } catch (e) {
-        console.warn('metrics cache load failed', e);
+        console.warn('cache load failed', e);
     }
 }
 
@@ -85,13 +102,18 @@ function switchTab(tabName) {
             break;
         case 'services':
             loadServices();
+            // Ensure buttons respect read-only after load
+            setTimeout(() => {
+                document.querySelectorAll('[data-protected="true"]').forEach(btn => {
+                    btn.disabled = state.readOnly;
+                });
+            }, 100);
             break;
         case 'network':
             // Don't auto-load, wait for user to click
             break;
         case 'graphs':
             renderCharts();
-    saveMetricsCache();
             break;
         case 'terminal':
             if (guardDangerous()) {
@@ -123,13 +145,35 @@ function initializeAutoRefresh() {
         if (refreshCountdown <= 0) {
             refreshCountdown = 10;
             
-            // Only refresh if on dashboard tab
+            // Always collect metrics in background
+            collectMetricsInBackground();
+            
+            // Only refresh UI if on dashboard tab
             const activTab = document.querySelector('.tab-content.active');
             if (activTab && activTab.id === 'dashboard-tab') {
+                console.log('[Auto-refresh] Refreshing dashboard...');
                 loadDashboard();
             }
         }
     }, 1000);
+}
+
+async function collectMetricsInBackground() {
+    try {
+        const [dashResponse, creditsResponse] = await Promise.all([
+            fetch('/api/dashboard'),
+            fetch('/api/devnet-eligibility')
+        ]);
+        const dashData = await dashResponse.json();
+        const creditsData = await creditsResponse.json();
+        
+        if (dashData.success) {
+            const creditsVal = creditsData.success ? creditsData.localCredits : null;
+            recordMetrics(dashData.system, creditsVal);
+        }
+    } catch (error) {
+        console.warn('[Background] Metrics collection failed:', error);
+    }
 }
 
 
@@ -178,8 +222,17 @@ async function loadDashboard() {
             updateServiceStatus(data.services);
             updateNetworkStatus(data.network);
             updateHealthScore(data);
-            const credits = await loadDashboardCredits();
-            recordMetrics(data.system, credits.localCredits);
+            
+            // Load credits but don't block metrics recording if it fails
+            let creditsVal = null;
+            try {
+                const credits = await loadDashboardCredits();
+                creditsVal = credits.localCredits;
+            } catch (err) {
+                console.warn('Credits load failed, recording metrics without credits');
+            }
+            
+            recordMetrics(data.system, creditsVal);
         }
     } catch (error) {
         console.error('Error loading dashboard:', error);
@@ -273,11 +326,20 @@ async function updateHealthScore(data) {
         const health = await response.json();
         
         if (health.success) {
-            document.getElementById('health-score').textContent = health.score;
+            // Check if pod service is running
+            const podRunning = data?.services?.services?.pod?.running;
             
             const statusBadge = document.getElementById('health-status');
-            statusBadge.textContent = health.status;
-            statusBadge.className = `status-badge ${health.status}`;
+            
+            if (podRunning === false) {
+                document.getElementById('health-score').textContent = '0';
+                statusBadge.textContent = 'DISCONNECTED';
+                statusBadge.className = 'status-badge critical';
+            } else {
+                document.getElementById('health-score').textContent = health.score;
+                statusBadge.textContent = health.status;
+                statusBadge.className = `status-badge ${health.status}`;
+            }
         }
     } catch (error) {
         console.error('Error loading health:', error);
@@ -359,7 +421,13 @@ function recordMetrics(system, creditsVal) {
     pushMetric(state.metrics.memory, now, system?.memory?.percentage);
     pushMetric(state.metrics.disk, now, system?.disk?.percentage);
     pushMetric(state.metrics.credits, now, creditsVal);
-    renderCharts();
+    saveMetricsCache();
+    console.log('Recorded metrics:', {
+        cpu: state.metrics.cpu.length,
+        mem: state.metrics.memory.length,
+        disk: state.metrics.disk.length,
+        credits: state.metrics.credits.length
+    });
 }
 
 function pushMetric(arr, ts, value) {
@@ -412,18 +480,29 @@ function ensureCharts() {
         };
         state.charts.cpu = new Chart(document.getElementById('chart-cpu'), {
             ...common,
+            options: { ...common.options, scales: { x: common.options.scales.x, y: { beginAtZero: true, max: 100 } } },
             data: { labels: [], datasets: [{ label: 'CPU %', data: [], borderColor: '#6366f1', tension: 0.3 }] }
         });
         state.charts.memory = new Chart(document.getElementById('chart-memory'), {
             ...common,
+            options: { ...common.options, scales: { x: common.options.scales.x, y: { beginAtZero: true, max: 100 } } },
             data: { labels: [], datasets: [{ label: 'Memory %', data: [], borderColor: '#22c55e', tension: 0.3 }] }
         });
         state.charts.disk = new Chart(document.getElementById('chart-disk'), {
             ...common,
+            options: { ...common.options, scales: { x: common.options.scales.x, y: { beginAtZero: true, max: 100 } } },
             data: { labels: [], datasets: [{ label: 'Disk %', data: [], borderColor: '#f59e0b', tension: 0.3 }] }
         });
         state.charts.credits = new Chart(document.getElementById('chart-credits'), {
-            ...common,
+            type: 'line',
+            options: {
+                animation: false,
+                plugins: { legend: { display: false } },
+                scales: {
+                    x: { ticks: { autoSkip: true, maxTicksLimit: 2 } },
+                    y: { beginAtZero: true, max: 90000 }
+                }
+            },
             data: { labels: [], datasets: [{ label: 'Credits', data: [], borderColor: '#06b6d4', tension: 0.3 }] }
         });
     }
@@ -476,22 +555,25 @@ function updateAPIFormat(method, params = {}) {
         payload.params = params;
     }
     
-    // Fetch external IP for curl command (or use placeholder)
-    fetch('/api/network')
-        .then(res => res.json())
-        .then(data => {
-            const ip = data.diagnostics?.public?.ip || 'YOUR_PUBLIC_IP';
-            const curlCmd = `curl -X POST http://${ip}:6000/rpc \\
+    const ip = state.cachedIP || 'YOUR_PUBLIC_IP';
+    const curlCmd = `curl -X POST http://${ip}:6000/rpc \\
   -H "Content-Type: application/json" \\
   -d '${JSON.stringify(payload, null, 2)}'`;
-            el.textContent = curlCmd;
-        })
-        .catch(() => {
-            const curlCmd = `curl -X POST http://YOUR_PUBLIC_IP:6000/rpc \\
-  -H "Content-Type: application/json" \\
-  -d '${JSON.stringify(payload, null, 2)}'`;
-            el.textContent = curlCmd;
-        });
+    el.textContent = curlCmd;
+    
+    // Refresh IP in background if not cached
+    if (!state.cachedIP) {
+        fetch('/api/network')
+            .then(res => res.json())
+            .then(data => {
+                state.cachedIP = data.diagnostics?.public?.ip;
+                localStorage.setItem('xpm_ip', state.cachedIP);
+                if (state.cachedIP && state.cachedIP !== ip) {
+                    updateAPIFormat(method, params);
+                }
+            })
+            .catch(() => {});
+    }
 }
 
 // ============================================================================
@@ -534,16 +616,31 @@ function displayServices(services) {
             </div>
             <pre style="color: var(--text-secondary); font-size: 12px; margin-top: 10px; max-height: 300px; overflow-y: auto;">${status.output.substring(0, 2000)}</pre>
         `;
-                const buttons = item.querySelectorAll('button');
+        const buttons = item.querySelectorAll('button');
         buttons.forEach(btn => btn.disabled = state.readOnly);
         container.appendChild(item);
     }
+    
+    // Also update Restart All button state
+    const restartAllBtn = document.querySelector('[onclick="restartAllServices()"]');
+    if (restartAllBtn) {
+        restartAllBtn.disabled = state.readOnly;
+    }
+    
+    console.log('Services loaded, read-only:', state.readOnly);
 }
 
 async function controlService(name, action) {
     if (guardDangerous()) return;
-    if (!confirm(`Are you sure you want to ${action} ${name}?`)) {
-        return;
+    
+    if (name === 'xandeum-pod-monitor' && (action === 'stop' || action === 'restart')) {
+        if (!confirm(`WARNING: ${action} on xandeum-pod-monitor will disconnect this interface. Continue?`)) {
+            return;
+        }
+    } else {
+        if (!confirm(`Are you sure you want to ${action} ${name}?`)) {
+            return;
+        }
     }
     
     try {
