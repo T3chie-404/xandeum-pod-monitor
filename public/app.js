@@ -284,6 +284,25 @@ async function loadDashboardCredits() {
     }
 }
 
+
+async function forcePubkeyScan() {
+    if (guardDangerous()) return;
+    const out = document.getElementById('eligibility-output');
+    if (out) out.textContent = 'Restarting pod to rescan pubkey...';
+    try {
+        const resp = await fetch('/api/find-pubkey', { method: 'POST' });
+        const data = await resp.json();
+        if (data.success && data.pubkey) {
+            if (out) out.textContent = `Pubkey found: ${data.pubkey}. Refreshing credits...`;
+            await loadDashboardCredits();
+        } else {
+            if (out) out.textContent = 'Pubkey not found in recent logs.';
+        }
+    } catch (err) {
+        if (out) out.textContent = 'Error scanning pubkey: ' + err.message;
+    }
+}
+
 async function checkEligibility() {
     const result = await loadDashboardCredits();
     if (result.localCredits === null) {
@@ -396,7 +415,12 @@ function renderCharts() {
         { chart: charts.credits, data: filterByRange(state.metrics.credits) },
     ];
     datasets.forEach(({ chart, data }) => {
-        chart.data.labels = data.map(d => new Date(d.t));
+        chart.data.labels = data.map((_, idx) => {
+            if (data.length === 1) return state.graphsRange === "10m" ? "-10m" : "now";
+            if (idx === 0) return "-" + state.graphsRange;
+            if (idx === data.length - 1) return "now";
+            return "";
+        });
         chart.data.datasets[0].data = data.map(d => d.v);
         chart.update('none');
     });
@@ -734,28 +758,6 @@ function connectTerminalWebSocket() {
     terminalSocket.onclose = () => {
         terminal.write('\r\n\x1b[31mDisconnected from terminal\x1b[0m\r\n');
     };
-}
-
-function sendQuickCommand(command) {
-    if (guardDangerous()) return;
-    if (!terminal || !terminalSocket || terminalSocket.readyState !== WebSocket.OPEN) {
-        alert('Terminal not connected');
-        return;
-    }
-    
-    // Send the command
-    for (let i = 0; i < command.length; i++) {
-        terminalSocket.send(JSON.stringify({
-            type: 'input',
-            data: command.charAt(i)
-        }));
-    }
-    
-    // Send Enter key
-    terminalSocket.send(JSON.stringify({
-        type: 'input',
-        data: '\r'
-    }));
 }
 
 function reconnectTerminal() {

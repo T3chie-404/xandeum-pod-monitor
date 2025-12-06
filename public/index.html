@@ -80,9 +80,9 @@
                         <div class="stat-label">My pod</div>
                     </div>
                     <div class="card">
-                        <h3>Max Credits (95th)</h3>
+                        <h3>Top Earner</h3>
                         <div class="stat-value" id="credits-max">--</div>
-                        <div class="stat-label">95th percentile</div>
+                        <div class="stat-label">Highest credits (max)</div>
                     </div>
                 </div>
 
@@ -108,6 +108,7 @@
                     <div class="action-bar">
                         <button class="btn btn-primary" onclick="checkEligibility()">Check Eligibility</button>
                         <button class="btn btn-secondary" onclick="loadDashboardCredits()">Refresh Credits</button>
+                        <button class="btn btn-danger" data-protected="true" onclick="forcePubkeyScan()">Force Pubkey Scan (restarts pod)</button>
                     </div>
                     <div id="eligibility-output" class="stat-label">--</div>
                 </div>
@@ -139,6 +140,7 @@
                         <option value="pod">pod</option>
                         <option value="xandminer">xandminer</option>
                         <option value="xandminerd">xandminerd</option>
+                        <option value="xandeum-pod-monitor">xandeum-pod-monitor</option>
                     </select>
                     <input type="text" id="log-filter" placeholder="Filter logs (e.g., 'error', 'pubkey')">
                     <button class="btn btn-primary" onclick="loadLogs()">Load Logs</button>
@@ -196,8 +198,6 @@
             <div id="terminal-tab" class="tab-content">
                 <h2>Interactive Terminal</h2>
                 <div class="terminal-controls">
-                    <button class="btn btn-secondary" data-protected="true" onclick="sendQuickCommand('/root/check_network.sh')">Check Network</button>
-                    <button class="btn btn-secondary" data-protected="true" onclick="sendQuickCommand('systemctl status pod')">Pod Status</button>
                     <button class="btn btn-danger" data-protected="true" onclick="reconnectTerminal()">Reconnect</button>
                 </div>
                 <div id="terminal-container" class="terminal-wrapper"></div>
