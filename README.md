@@ -57,6 +57,43 @@ Interactive web-based monitoring and management dashboard for Xandeum pNodes. Mo
 - **Activity logging** - All terminal commands are logged
 - **Confirmation dialogs** - For all destructive actions
 
+## 🚀 Quick Start: Turn-Key HTTPS Setup
+
+**NEW!** The easiest way to enable secure HTTPS access for non-technical users:
+
+```bash
+cd /root/xandeum-pod-monitor
+sudo bash setup-https.sh
+```
+
+This interactive wizard will:
+- ✅ Install and configure nginx automatically
+- ✅ Generate SSL certificates (self-signed or Let's Encrypt)
+- ✅ Set up password authentication
+- ✅ Configure secure reverse proxy
+- ✅ Test and verify the setup
+
+**No manual configuration needed!** Just answer a few simple questions:
+1. Do you want HTTPS? (y/n)
+2. Choose username (default: admin)
+3. Create password
+4. Self-signed or Let's Encrypt certificate?
+
+Then access your monitor at: `https://YOUR-IP:8443`
+
+### Options
+
+```bash
+# Enable HTTPS (interactive)
+sudo bash setup-https.sh
+
+# Remove HTTPS setup
+sudo bash setup-https.sh --remove
+
+# Non-interactive mode (for automation)
+SKIP_HTTPS_PROMPT=1 HTTPS_USERNAME=admin HTTPS_PASSWORD=yourpass sudo bash setup-https.sh
+```
+
 ## Installation
 
 ### Quick Install

@@ -1,3 +1,49 @@
+// Read-only mode state
+let readonlyMode = true;
+
+// Initialize read-only toggle
+document.addEventListener('DOMContentLoaded', function() {
+    const toggle = document.getElementById('readonly-toggle');
+    const status = document.getElementById('readonly-status');
+    const container = document.querySelector('.app-container');
+    
+    if (toggle) {
+        toggle.addEventListener('change', function() {
+            readonlyMode = !this.checked;
+            if (readonlyMode) {
+                container.classList.add('readonly-mode');
+                status.querySelector('.status-indicator').classList.add('readonly-active');
+                status.querySelector('.status-text').textContent = 'Protected';
+            } else {
+                container.classList.remove('readonly-mode');
+                status.querySelector('.status-indicator').classList.remove('readonly-active');
+                status.querySelector('.status-text').textContent = 'Unlocked';
+            }
+        });
+        
+        // Initialize
+        container.classList.add('readonly-mode');
+    }
+});
+
+// Check if read-only mode is enabled
+function isReadOnly() {
+    return readonlyMode;
+}
+
+// Show confirmation for dangerous actions
+function confirmDangerousAction(action, callback) {
+    if (isReadOnly()) {
+        alert('⚠️ Read-only mode is enabled. Disable it to perform this action.');
+        return false;
+    }
+    if (confirm(`⚠️ Are you sure you want to ${action}?`)) {
+        callback();
+        return true;
+    }
+    return false;
+}
+
 // Global variables
 let terminal = null;
 let terminalSocket = null;
@@ -5,23 +51,10 @@ let fitAddon = null;
 let refreshInterval = null;
 let refreshCountdown = 10;
 
-const state = {
-    readOnly: true,
-    graphsRange: '10m',
-    charts: {},
-    metrics: {
-        cpu: [],
-        memory: [],
-        disk: [],
-        credits: []
-    }
-};
-
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', function() {
     initializeTabs();
     initializeAutoRefresh();
-    initReadOnlyToggle();
     loadDashboard();
 });
 
@@ -30,7 +63,7 @@ document.addEventListener('DOMContentLoaded', function() {
 // ============================================================================
 
 function initializeTabs() {
-    const tabButtons = document.querySelectorAll('.tab-btn');
+    const tabButtons = document.querySelectorAll('.nav-tab');
     
     tabButtons.forEach(button => {
         button.addEventListener('click', function() {
@@ -42,7 +75,7 @@ function initializeTabs() {
 
 function switchTab(tabName) {
     // Update buttons
-    document.querySelectorAll('.tab-btn').forEach(btn => {
+    document.querySelectorAll('.nav-tab').forEach(btn => {
         btn.classList.remove('active');
     });
     document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
@@ -64,13 +97,7 @@ function switchTab(tabName) {
         case 'network':
             // Don't auto-load, wait for user to click
             break;
-        case 'graphs':
-            renderCharts();
-            break;
         case 'terminal':
-            if (guardDangerous()) {
-                return;
-            }
             if (!terminal) {
                 initializeTerminal();
             } else {
@@ -106,38 +133,6 @@ function initializeAutoRefresh() {
     }, 1000);
 }
 
-
-// Read-only toggle
-function initReadOnlyToggle() {
-    const toggle = document.getElementById('readonly-toggle');
-    const pill = document.getElementById('readonly-status');
-    if (!toggle || !pill) return;
-
-    const apply = () => {
-        state.readOnly = toggle.checked;
-        pill.textContent = state.readOnly ? 'Protected' : 'Unprotected';
-        pill.classList.toggle('protected', state.readOnly);
-        pill.classList.toggle('unprotected', !state.readOnly);
-        document.querySelectorAll('[data-protected="true"]').forEach(btn => {
-            btn.disabled = state.readOnly;
-        });
-    };
-
-    toggle.addEventListener('change', () => {
-        apply();
-    });
-
-    apply();
-}
-
-function guardDangerous() {
-    if (state.readOnly) {
-        alert('Read-Only mode is on. Toggle off to run commands.');
-        return true;
-    }
-    return false;
-}
-
 // ============================================================================
 // DASHBOARD
 // ============================================================================
@@ -152,8 +147,6 @@ async function loadDashboard() {
             updateServiceStatus(data.services);
             updateNetworkStatus(data.network);
             updateHealthScore(data);
-            const credits = await loadDashboardCredits();
-            recordMetrics(data.system, credits.localCredits);
         }
     } catch (error) {
         console.error('Error loading dashboard:', error);
@@ -174,35 +167,8 @@ function updateSystemStats(system) {
     }
     
     if (system.uptime) {
-        document.getElementById('uptime').textContent = formatUptime(system.uptime.uptime);
+        document.getElementById(uptime-value).textContent = system.uptime.uptime.replace('up ', '');
     }
-
-    if (system.xandeumPages) {
-        const el = document.getElementById('xandeum-pages');
-        if (el) {
-            const size = system.xandeumPages.sizeGB !== undefined ? `${system.xandeumPages.sizeGB} GB` : `${system.xandeumPages.sizeMB} MB`;
-            el.textContent = `Xandeum-Pages: ${size}`;
-        }
-    }
-}
-
-function formatUptime(uptimeStr) {
-    if (!uptimeStr) return '--';
-    const parts = { day: 0, hour: 0, minute: 0 };
-    const regex = /(\d+)\s+(day|days|hour|hours|minute|minutes)/g;
-    let match;
-    while ((match = regex.exec(uptimeStr)) !== null) {
-        const val = parseInt(match[1]);
-        const unit = match[2];
-        if (unit.startsWith('day')) parts.day = val;
-        else if (unit.startsWith('hour')) parts.hour = val;
-        else if (unit.startsWith('minute')) parts.minute = val;
-    }
-    const out = [];
-    if (parts.day) out.push(`${parts.day}d`);
-    if (parts.hour || parts.day) out.push(`${parts.hour}h`);
-    out.push(`${parts.minute}m`);
-    return out.join(' ');
 }
 
 function updateServiceStatus(services) {
@@ -249,168 +215,13 @@ async function updateHealthScore(data) {
         if (health.success) {
             document.getElementById('health-score').textContent = health.score;
             
-            const statusBadge = document.getElementById('health-status');
+            const statusBadge = document.getElementById(health-score);
             statusBadge.textContent = health.status;
             statusBadge.className = `status-badge ${health.status}`;
         }
     } catch (error) {
         console.error('Error loading health:', error);
     }
-}
-
-// Credits & charts
-async function loadDashboardCredits() {
-    try {
-        const response = await fetch('/api/devnet-eligibility');
-        const data = await response.json();
-        if (!data.success) throw new Error(data.error || 'Failed to load credits');
-
-        const earnedEl = document.getElementById('credits-earned');
-        const maxEl = document.getElementById('credits-max');
-        if (earnedEl) earnedEl.textContent = data.localCredits !== null && data.localCredits !== undefined ? data.localCredits.toFixed(0) : '--';
-        if (maxEl) maxEl.textContent = data.percentile95 !== null && data.percentile95 !== undefined ? data.percentile95.toFixed(0) : '--';
-
-        renderEligibilityOutput(data);
-        return { localCredits: data.localCredits, maxCredits: data.maxCredits };
-    } catch (error) {
-        console.error('Error loading credits:', error);
-        const earnedEl = document.getElementById('credits-earned');
-        const maxEl = document.getElementById('credits-max');
-        if (earnedEl) earnedEl.textContent = '--';
-        if (maxEl) maxEl.textContent = '--';
-        const out = document.getElementById('eligibility-output');
-        if (out) out.textContent = 'Unable to load credits right now.';
-        return { localCredits: null, maxCredits: null };
-    }
-}
-
-async function checkEligibility() {
-    const result = await loadDashboardCredits();
-    if (result.localCredits === null) {
-        alert('Unable to determine eligibility yet.');
-    }
-}
-
-function renderEligibilityOutput(data) {
-    const out = document.getElementById('eligibility-output');
-    if (!out) return;
-    if (!data.success) {
-        out.textContent = 'Unable to load eligibility.';
-        return;
-    }
-    const parts = [];
-    if (data.pubkey) parts.push(`Pubkey: ${data.pubkey}`);
-    if (data.localCredits !== null && data.localCredits !== undefined) parts.push(`My credits: ${data.localCredits}`);
-    if (data.threshold !== null && data.threshold !== undefined) parts.push(`Threshold (80% of P95): ${data.threshold}`);
-    if (data.maxCredits !== null && data.maxCredits !== undefined) parts.push(`Top earner: ${data.maxCredits}`);
-    if (data.percentile95 !== null && data.percentile95 !== undefined) parts.push(`P95 earner: ${data.percentile95}`);
-    if (data.eligible !== null && data.eligible !== undefined) parts.push(`Eligible: ${data.eligible ? 'Yes' : 'No'}`);
-    out.textContent = parts.join(' | ');
-}
-
-function recordMetrics(system, creditsVal) {
-    const now = Date.now();
-    pushMetric(state.metrics.cpu, now, system?.cpu?.usage);
-    pushMetric(state.metrics.memory, now, system?.memory?.percentage);
-    pushMetric(state.metrics.disk, now, system?.disk?.percentage);
-    pushMetric(state.metrics.credits, now, creditsVal);
-    renderCharts();
-}
-
-function pushMetric(arr, ts, value) {
-    if (typeof value !== 'number' || Number.isNaN(value)) return;
-    arr.push({ t: ts, v: value });
-    if (arr.length > 1000) arr.shift();
-}
-
-function setGraphRange(range) {
-    state.graphsRange = range;
-    updateGraphRangeButtons();
-    renderCharts();
-}
-
-function updateGraphRangeButtons() {
-    document.querySelectorAll('.graph-controls .btn').forEach(btn => {
-        const active = btn.getAttribute('data-range') === state.graphsRange;
-        btn.classList.toggle('btn-primary', active);
-        btn.classList.toggle('btn-secondary', !active);
-    });
-}
-
-function getRangeMs() {
-    switch (state.graphsRange) {
-        case '10m': return 10 * 60 * 1000;
-        case '6h': return 6 * 60 * 60 * 1000;
-        case '24h': return 24 * 60 * 60 * 1000;
-        default: return 10 * 60 * 1000;
-    }
-}
-
-function filterByRange(arr) {
-    const cutoff = Date.now() - getRangeMs();
-    return arr.filter(p => p.t >= cutoff);
-}
-
-function ensureCharts() {
-    if (!window.Chart) return;
-    if (!state.charts.cpu) {
-        const common = {
-            type: 'line',
-            options: {
-                animation: false,
-                plugins: { legend: { display: false } },
-                scales: {
-                    x: { ticks: { autoSkip: true, maxTicksLimit: 2 } },
-                    y: { beginAtZero: true }
-                }
-            }
-        };
-        state.charts.cpu = new Chart(document.getElementById('chart-cpu'), {
-            ...common,
-            data: { labels: [], datasets: [{ label: 'CPU %', data: [], borderColor: '#6366f1', tension: 0.3 }] }
-        });
-        state.charts.memory = new Chart(document.getElementById('chart-memory'), {
-            ...common,
-            data: { labels: [], datasets: [{ label: 'Memory %', data: [], borderColor: '#22c55e', tension: 0.3 }] }
-        });
-        state.charts.disk = new Chart(document.getElementById('chart-disk'), {
-            ...common,
-            data: { labels: [], datasets: [{ label: 'Disk %', data: [], borderColor: '#f59e0b', tension: 0.3 }] }
-        });
-        state.charts.credits = new Chart(document.getElementById('chart-credits'), {
-            ...common,
-            data: { labels: [], datasets: [{ label: 'Credits', data: [], borderColor: '#06b6d4', tension: 0.3 }] }
-        });
-    }
-}
-
-function renderCharts() {
-    ensureCharts();
-    const charts = state.charts;
-    if (!charts.cpu) return;
-    updateGraphRangeButtons();
-    const datasets = [
-        { chart: charts.cpu, data: filterByRange(state.metrics.cpu) },
-        { chart: charts.memory, data: filterByRange(state.metrics.memory) },
-        { chart: charts.disk, data: filterByRange(state.metrics.disk) },
-        { chart: charts.credits, data: filterByRange(state.metrics.credits) },
-    ];
-    datasets.forEach(({ chart, data }) => {
-        chart.data.labels = data.map(d => new Date(d.t));
-        chart.data.datasets[0].data = data.map(d => d.v);
-        chart.update('none');
-    });
-}
-
-// Health formula popup
-function toggleHealthFormula(forceHide = false) {
-    const modal = document.getElementById('health-formula-modal');
-    if (!modal) return;
-    if (forceHide) {
-        modal.classList.add('hidden');
-        return;
-    }
-    modal.classList.toggle('hidden');
 }
 
 // ============================================================================
@@ -446,21 +257,22 @@ function displayServices(services) {
                     </span>
                 </div>
                 <div class="service-actions">
-                    <button class="btn btn-primary" data-protected="true" onclick="controlService('${name}', 'start')">Start</button>
-                    <button class="btn btn-danger" data-protected="true" onclick="controlService('${name}', 'stop')">Stop</button>
-                    <button class="btn btn-secondary" data-protected="true" onclick="controlService('${name}', 'restart')">Restart</button>
+                    <button class="btn btn-primary" onclick="controlService('${name}', 'start')">Start</button>
+                    <button class="btn btn-danger" onclick="controlService('${name}', 'stop')">Stop</button>
+                    <button class="btn btn-secondary" onclick="controlService('${name}', 'restart')">Restart</button>
                 </div>
             </div>
-            <pre style="color: var(--text-secondary); font-size: 12px; margin-top: 10px; max-height: 300px; overflow-y: auto;">${status.output.substring(0, 2000)}</pre>
+            <pre style="color: var(--text-secondary); font-size: 12px; margin-top: 10px; max-height: 100px; overflow-y: auto;">${status.output.substring(0, 500)}</pre>
         `;
-                const buttons = item.querySelectorAll('button');
-        buttons.forEach(btn => btn.disabled = state.readOnly);
         container.appendChild(item);
     }
 }
 
 async function controlService(name, action) {
-    if (guardDangerous()) return;
+    if (isReadOnly() && (action === 'restart' || action === 'stop' || action === 'start')) {
+        alert('⚠️ Read-only mode is enabled. Disable it to control services.');
+        return;
+    }
     if (!confirm(`Are you sure you want to ${action} ${name}?`)) {
         return;
     }
@@ -483,7 +295,13 @@ async function controlService(name, action) {
 }
 
 async function restartAllServices() {
-    if (guardDangerous()) return;
+    if (isReadOnly()) {
+        alert('⚠️ Read-only mode is enabled. Disable it to restart services.');
+        return;
+    }
+    if (!confirm('⚠️ Are you sure you want to restart ALL services?')) {
+        return;
+    }
     if (!confirm('Are you sure you want to restart ALL services?')) {
         return;
     }
@@ -540,7 +358,6 @@ async function loadLogs() {
 }
 
 async function findPubkey() {
-    if (guardDangerous()) return;
     if (!confirm('This will restart the pod service. Continue?')) {
         return;
     }
@@ -684,12 +501,25 @@ function initializeTerminal() {
     
     connectTerminalWebSocket();
     
+    
     // Handle window resize
     window.addEventListener('resize', () => {
         if (fitAddon) {
             fitAddon.fit();
         }
     });
+    
+    // Handle terminal wrapper resize (when user drags corner)
+    const terminalWrapper = document.querySelector('.terminal-wrapper');
+    if (terminalWrapper && window.ResizeObserver) {
+        const resizeObserver = new ResizeObserver(() => {
+            if (fitAddon) {
+                // Small delay to ensure DOM has updated
+                setTimeout(() => fitAddon.fit(), 10);
+            }
+        });
+        resizeObserver.observe(terminalWrapper);
+    }
 }
 
 function connectTerminalWebSocket() {
@@ -737,7 +567,10 @@ function connectTerminalWebSocket() {
 }
 
 function sendQuickCommand(command) {
-    if (guardDangerous()) return;
+    if (isReadOnly()) {
+        alert('⚠️ Read-only mode is enabled. Disable it to send commands to terminal.');
+        return;
+    }
     if (!terminal || !terminalSocket || terminalSocket.readyState !== WebSocket.OPEN) {
         alert('Terminal not connected');
         return;
@@ -771,3 +604,61 @@ function reconnectTerminal() {
         connectTerminalWebSocket();
     }, 500);
 }
+
+// Check TMUX status
+async function checkTmuxStatus() {
+    try {
+        const response = await fetch("/api/tmux-status");
+        const status = await response.json();
+        const badge = document.getElementById("tmux-status");
+        if (badge) {
+            if (status.available) {
+                if (status.sessionExists) {
+                    badge.textContent = `TMUX: Attached to ${status.sessionName}`;
+                    badge.style.background = "rgba(16, 185, 129, 0.1)";
+                    badge.style.borderColor = "#10b981";
+                    badge.style.color = "#10b981";
+                } else {
+                    badge.textContent = "TMUX: Session will be created";
+                    badge.style.background = "rgba(245, 158, 11, 0.1)";
+                    badge.style.borderColor = "#f59e0b";
+                    badge.style.color = "#f59e0b";
+                }
+            } else {
+                badge.textContent = "TMUX: Not available (using regular shell)";
+                badge.style.background = "rgba(239, 68, 68, 0.1)";
+                badge.style.borderColor = "#ef4444";
+                badge.style.color = "#ef4444";
+            }
+        }
+    } catch (error) {
+        console.error("Failed to check TMUX status:", error);
+    }
+}
+
+// Update service functions to check read-only mode
+const originalRestartAllServices = window.restartAllServices;
+window.restartAllServices = function() {
+    if (isReadOnly()) {
+        alert("⚠️ Read-only mode is enabled. Disable it to restart services.");
+        return;
+    }
+    if (confirm("⚠️ Are you sure you want to restart ALL services?")) {
+        originalRestartAllServices();
+    }
+};
+
+// Update tab switching to check TMUX status
+document.addEventListener("DOMContentLoaded", function() {
+    const terminalTab = document.querySelector('[data-tab="terminal"]');
+    if (terminalTab) {
+        terminalTab.addEventListener("click", function() {
+            setTimeout(checkTmuxStatus, 500);
+        });
+    }
+    
+    // Check TMUX status on page load if terminal tab is active
+    if (document.getElementById("terminal-tab").classList.contains("active")) {
+        checkTmuxStatus();
+    }
+});

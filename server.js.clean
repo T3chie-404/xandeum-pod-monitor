@@ -3,7 +3,6 @@ const http = require("http");
 const WebSocket = require("ws");
 const path = require("path");
 const fs = require("fs");
-const axios = require("axios");
 
 // Import our library modules
 const ServiceManager = require("./lib/services");
@@ -11,7 +10,6 @@ const PRPCClient = require("./lib/api");
 const LogManager = require("./lib/logs");
 const NetworkManager = require("./lib/network");
 const SystemMonitor = require("./lib/system");
-const terminalManager = require("./lib/terminal");
 
 // Load configuration
 const config = JSON.parse(fs.readFileSync("./config.json", "utf8"));
@@ -22,6 +20,7 @@ const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 // Initialize Terminal Manager
+const terminalManager = require("./lib/terminal");
 
 // Middleware
 app.use(express.json());
@@ -226,9 +225,272 @@ app.get("/api/network", async (req, res) => {
  * System stats
  */
 app.get("/api/system", async (req, res) => {
+
+// Xandeum disk space endpoint
+app.get("/api/xandeum-space", async (req, res) => {
+
+// Devnet eligibility check endpoint
+app.get("/api/devnet-eligibility", async (req, res) => {
   try {
-    const stats = await SystemMonitor.getAllStats();
-    res.json({ success: true, stats });
+    const axios = require("axios");
+    
+    // Fetch all pod credits
+    const response = await axios.get("https://podcredits.xandeum.network/api/pods-credits");
+    const allPods = response.data.pods_credits;
+    
+    if (!allPods || !Array.isArray(allPods)) {
+      return res.status(500).json({ success: false, error: "Invalid API response" });
+    }
+    
+    // Extract credits values and sort
+    const creditsValues = allPods.map(pod => pod.credits || 0).sort((a, b) => b - a);
+    
+    // Calculate statistics
+    const highest = creditsValues[0] || 0;
+    const percentile95Index = Math.floor(creditsValues.length * 0.05);
+    const percentile95 = creditsValues[percentile95Index] || 0;
+    const threshold = percentile95 * 0.8;
+    
+    // This would need the pod public key - you may need to adjust based on how to identify your pod
+    
+    res.json({
+      success: true,
+      devnet: {
+        highest: highest,
+        percentile95: percentile95,
+        threshold: threshold,
+        currentPod: currentPodCredits,
+        eligible: isEligible,
+        totalPods: creditsValues.length,
+        calculation: `80% of 95th percentile: ${percentile95.toFixed(2)} × 0.8 = ${threshold.toFixed(2)}`
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// Get local pod public key
+app.get("/api/pod-pubkey", async (req, res) => {
+  try {
+    const fs = require("fs");
+    const keypairPath = "/local/keypairs/pnode-keypair.json";
+    
+    if (fs.existsSync(keypairPath)) {
+      const keypairData = JSON.parse(fs.readFileSync(keypairPath, "utf8"));
+      res.json({ success: true, pubkey: keypairData.publicKey });
+    } else {
+      res.json({ success: false, error: "Keypair not found" });
+    }
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+  try {
+    const axios = require("axios");
+    
+    // Fetch all pod credits
+    const response = await axios.get("https://podcredits.xandeum.network/api/pods-credits");
+    const allPods = response.data.pods_credits;
+    
+    if (!allPods || !Array.isArray(allPods)) {
+      return res.status(500).json({ success: false, error: "Invalid API response" });
+    }
+    
+    // Extract credits values and sort
+    const creditsValues = allPods.map(pod => pod.credits || 0).sort((a, b) => b - a);
+    
+    // Calculate statistics
+    const highest = creditsValues[0] || 0;
+    const percentile95Index = Math.floor(creditsValues.length * 0.05);
+    const percentile95 = creditsValues[percentile95Index] || 0;
+    const threshold = percentile95 * 0.8;
+    
+    // This would need the pod public key - you may need to adjust based on how to identify your pod
+    
+    res.json({
+      success: true,
+      devnet: {
+        highest: highest,
+        percentile95: percentile95,
+        threshold: threshold,
+        currentPod: currentPodCredits,
+        eligible: isEligible,
+        totalPods: creditsValues.length,
+        calculation: `80% of 95th percentile: ${percentile95.toFixed(2)} × 0.8 = ${threshold.toFixed(2)}`
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+  try {
+    const { execSync } = require("child_process");
+    
+    // Calculate disk space for Xandeum components
+    let xandminerSize = 0;
+    let xandminerdSize = 0;
+    
+    // Check for xandeum data directory
+    let xandeumDataSize = 0;
+    try {
+      const xandeumDataOutput = execSync("du -sb /root/.xandeum 2>/dev/null || echo 0", { encoding: "utf-8" });
+      xandeumDataSize = parseInt(xandeumDataOutput.split("\t")[0]) || 0;
+    } catch (e) {}
+    let podSize = 0;
+    
+    try {
+      const xandminerOutput = execSync("du -sb /root/xandminer /root/.xandeum 2>/dev/null | grep xandminer 2>/dev/null || echo 0", { encoding: "utf-8" });
+      xandminerSize = parseInt(xandminerOutput.split("	")[0]) || 0;
+    } catch (e) {}
+    
+    try {
+      const xandminerdOutput = execSync("du -sb /root/xandminer /root/.xandeum 2>/dev/null | grep xandminerd 2>/dev/null || echo 0", { encoding: "utf-8" });
+      xandminerdSize = parseInt(xandminerdOutput.split("	")[0]) || 0;
+    
+    // Check for xandeum data directory
+    let xandeumDataSize = 0;
+    try {
+      const xandeumDataOutput = execSync("du -sb /root/.xandeum 2>/dev/null || echo 0", { encoding: "utf-8" });
+      xandeumDataSize = parseInt(xandeumDataOutput.split("\t")[0]) || 0;
+    } catch (e) {}
+    } catch (e) {}
+    
+    try {
+      const podOutput = execSync("dpkg -L pod 2>/dev/null | xargs du -cb 2>/dev/null | tail -1 || echo 0", { encoding: "utf-8" });
+      podSize = parseInt(podOutput.split("	")[0]) || 0;
+    } catch (e) {}
+    
+    
+    // Track xandeum-pages file
+    let xandeumPagesSize = 0;
+    try {
+      const pagesOutput = execSync("stat -c%s /xandeum-pages 2>/dev/null || echo 0", { encoding: "utf-8" });
+      xandeumPagesSize = parseInt(pagesOutput.trim()) || 0;
+    } catch (e) {}
+    
+    const totalBytes = xandminerSize + xandminerdSize + podSize + xandeumPagesSize;
+    const totalMB = (totalBytes / 1024 / 1024).toFixed(2);
+    const totalGB = (totalBytes / 1024 / 1024 / 1024).toFixed(2);
+    
+    res.json({
+      success: true,
+      xandeum: {
+        xandminer: { bytes: xandminerSize, mb: (xandminerSize / 1024 / 1024).toFixed(2) },
+        xandminerd: { bytes: xandminerdSize, mb: (xandminerdSize / 1024 / 1024).toFixed(2) },
+        pod: { bytes: podSize, mb: (podSize / 1024 / 1024).toFixed(2) },
+        xandeumPages: { bytes: xandeumPagesSize, mb: (xandeumPagesSize / 1024 / 1024).toFixed(2), gb: (xandeumPagesSize / 1024 / 1024 / 1024).toFixed(2) },
+        total: { bytes: totalBytes, mb: totalMB, gb: totalGB }
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+});
+
+// Xandeum disk space endpoint
+app.get("/api/xandeum-space", async (req, res) => {
+
+// Devnet eligibility check endpoint
+app.get("/api/devnet-eligibility", async (req, res) => {
+  try {
+    const axios = require("axios");
+    
+    // Fetch all pod credits
+    const response = await axios.get("https://podcredits.xandeum.network/api/pods-credits");
+    const allPods = response.data.pods_credits;
+    
+    if (!allPods || !Array.isArray(allPods)) {
+      return res.status(500).json({ success: false, error: "Invalid API response" });
+    }
+    
+    // Extract credits values and sort
+    const creditsValues = allPods.map(pod => pod.credits || 0).sort((a, b) => b - a);
+    
+    // Calculate statistics
+    const highest = creditsValues[0] || 0;
+    const percentile95Index = Math.floor(creditsValues.length * 0.05);
+    const percentile95 = creditsValues[percentile95Index] || 0;
+    const threshold = percentile95 * 0.8;
+    
+    // This would need the pod public key - you may need to adjust based on how to identify your pod
+    
+    res.json({
+      success: true,
+      devnet: {
+        highest: highest,
+        percentile95: percentile95,
+        threshold: threshold,
+        currentPod: currentPodCredits,
+        eligible: isEligible,
+        totalPods: creditsValues.length,
+        calculation: `80% of 95th percentile: ${percentile95.toFixed(2)} × 0.8 = ${threshold.toFixed(2)}`
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+  try {
+    const { execSync } = require("child_process");
+    
+    // Calculate disk space for Xandeum components
+    let xandminerSize = 0;
+    let xandminerdSize = 0;
+    
+    // Check for xandeum data directory
+    let xandeumDataSize = 0;
+    try {
+      const xandeumDataOutput = execSync("du -sb /root/.xandeum 2>/dev/null || echo 0", { encoding: "utf-8" });
+      xandeumDataSize = parseInt(xandeumDataOutput.split("\t")[0]) || 0;
+    } catch (e) {}
+    let podSize = 0;
+    
+    try {
+      const xandminerOutput = execSync("du -sb /root/xandminer /root/.xandeum 2>/dev/null | grep xandminer 2>/dev/null || echo 0", { encoding: "utf-8" });
+      xandminerSize = parseInt(xandminerOutput.split("	")[0]) || 0;
+    } catch (e) {}
+    
+    try {
+      const xandminerdOutput = execSync("du -sb /root/xandminer /root/.xandeum 2>/dev/null | grep xandminerd 2>/dev/null || echo 0", { encoding: "utf-8" });
+      xandminerdSize = parseInt(xandminerdOutput.split("	")[0]) || 0;
+    
+    // Check for xandeum data directory
+    let xandeumDataSize = 0;
+    try {
+      const xandeumDataOutput = execSync("du -sb /root/.xandeum 2>/dev/null || echo 0", { encoding: "utf-8" });
+      xandeumDataSize = parseInt(xandeumDataOutput.split("\t")[0]) || 0;
+    } catch (e) {}
+    } catch (e) {}
+    
+    try {
+      const podOutput = execSync("dpkg -L pod 2>/dev/null | xargs du -cb 2>/dev/null | tail -1 || echo 0", { encoding: "utf-8" });
+      podSize = parseInt(podOutput.split("	")[0]) || 0;
+    } catch (e) {}
+    
+    
+    // Track xandeum-pages file
+    let xandeumPagesSize = 0;
+    try {
+      const pagesOutput = execSync("stat -c%s /xandeum-pages 2>/dev/null || echo 0", { encoding: "utf-8" });
+      xandeumPagesSize = parseInt(pagesOutput.trim()) || 0;
+    } catch (e) {}
+    
+    const totalBytes = xandminerSize + xandminerdSize + podSize + xandeumPagesSize;
+    const totalMB = (totalBytes / 1024 / 1024).toFixed(2);
+    const totalGB = (totalBytes / 1024 / 1024 / 1024).toFixed(2);
+    
+    res.json({
+      success: true,
+      xandeum: {
+        xandminer: { bytes: xandminerSize, mb: (xandminerSize / 1024 / 1024).toFixed(2) },
+        xandminerd: { bytes: xandminerdSize, mb: (xandminerdSize / 1024 / 1024).toFixed(2) },
+        pod: { bytes: podSize, mb: (podSize / 1024 / 1024).toFixed(2) },
+        xandeumPages: { bytes: xandeumPagesSize, mb: (xandeumPagesSize / 1024 / 1024).toFixed(2), gb: (xandeumPagesSize / 1024 / 1024 / 1024).toFixed(2) },
+        total: { bytes: totalBytes, mb: totalMB, gb: totalGB }
+      }
+    });
   } catch (error) {
     res.status(500).json({ success: false, error: error.message });
   }
@@ -265,6 +527,8 @@ app.get("/api/health", async (req, res) => {
  * Get terminal activity log
  */
 app.get("/api/terminal/activity", (req, res) => {
+
+// TMUX status endpoint
   const limit = parseInt(req.query.limit) || 100;
   const log = terminalManager.getActivityLog(limit);
   res.json({ success: true, log });
@@ -273,80 +537,6 @@ app.get("/api/terminal/activity", (req, res) => {
 // ============================================================================
 // WEBSOCKET TERMINAL HANDLER
 // ============================================================================
-
-/**
- * Passive pubkey lookup (no restart)
- */
-app.get("/api/pod-pubkey", async (req, res) => {
-  try {
-    const result = await LogManager.getPubkeyPassive();
-    res.json(result);
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * Credits: fetch global list and local credits (if pubkey known)
- */
-app.get("/api/pod-credits", async (req, res) => {
-  try {
-    const [creditsResp, pubkeyResult] = await Promise.all([
-      axios.get("https://pods-credit.vercel.app/api/pods-credits", { timeout: 5000 }),
-      LogManager.getPubkeyPassive()
-    ]);
-
-    const list = Array.isArray(creditsResp.data?.pods_credits) ? creditsResp.data.pods_credits : [];
-    const pubkey = pubkeyResult.pubkey || null;
-    const local = pubkey ? list.find(p => p.pod_id === pubkey) : null;
-
-    res.json({
-      success: true,
-      pubkey,
-      credits: local ? local.credits : null,
-      list
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-/**
- * DevNet eligibility (95th percentile * 0.8 threshold)
- */
-app.get("/api/devnet-eligibility", async (req, res) => {
-  try {
-    const [creditsResp, pubkeyResult] = await Promise.all([
-      axios.get("https://pods-credit.vercel.app/api/pods-credits", { timeout: 5000 }),
-      LogManager.getPubkeyPassive()
-    ]);
-
-    const list = Array.isArray(creditsResp.data?.pods_credits) ? creditsResp.data.pods_credits : [];
-    const creditsOnly = list.map(p => p.credits).filter(c => typeof c === "number").sort((a, b) => a - b);
-    const count = creditsOnly.length;
-    const p95 = count > 0 ? creditsOnly[Math.floor(0.95 * (count - 1))] : null;
-    const threshold = p95 !== null ? Math.round(p95 * 0.8) : null;
-    const maxCredits = count > 0 ? creditsOnly[count - 1] : null;
-
-    const pubkey = pubkeyResult.pubkey || null;
-    const localEntry = pubkey ? list.find(p => p.pod_id === pubkey) : null;
-    const localCredits = localEntry ? localEntry.credits : null;
-    const eligible = threshold !== null && localCredits !== null ? localCredits >= threshold : null;
-
-    res.json({
-      success: true,
-      pubkey,
-      localCredits,
-      percentile95: p95,
-      threshold,
-      maxCredits,
-      eligible,
-      totalPods: count
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
 
 wss.on("connection", (ws) => {
   if (!config.security.enableTerminal) {
@@ -374,7 +564,7 @@ wss.on("connection", (ws) => {
     // Handle PTY exit
     ptyProcess.on("exit", () => {
       console.log(`[Terminal] PTY exited: ${sessionId}`);
-      terminalManager.closeSession(sessionId);
+      terminalManager.destroySession(sessionId);
       ws.close();
     });
     
@@ -403,13 +593,13 @@ wss.on("connection", (ws) => {
   // Handle WebSocket close
   ws.on("close", () => {
     console.log(`[Terminal] Connection closed: ${sessionId}`);
-    terminalManager.closeSession(sessionId);
+    terminalManager.destroySession(sessionId);
   });
   
   // Handle WebSocket error
   ws.on("error", (error) => {
     console.error(`[Terminal] WebSocket error: ${error.message}`);
-    terminalManager.closeSession(sessionId);
+    terminalManager.destroySession(sessionId);
   });
 });
 

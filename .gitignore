@@ -27,3 +27,6 @@ Thumbs.db
 
 # Custom config (if users modify)
 config.local.json
+
+# HTTPS configuration (contains sensitive info)
+.https-config

@@ -1,15 +1,17 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-equiv="Expires" content="0">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Xandeum Pod Monitor</title>
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style-new.css?v=1764983646">
     <!-- xterm.js for terminal -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.css" />
     <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <div class="container">
@@ -18,19 +20,8 @@
             <div class="header-content">
                 <h1>⚡ Xandeum Pod Monitor</h1>
                 <div class="health-indicator">
-                    <div class="health-info">
-                        <span id="health-score">--</span>
-                        <span id="health-status" class="status-badge">Loading...</span>
-                        <button class="icon-btn" id="health-info-btn" onclick="toggleHealthFormula()">?</button>
-                    </div>
-                    <div class="readonly-toggle">
-                        <span class="toggle-label">Read-Only</span>
-                        <label class="switch">
-                            <input type="checkbox" id="readonly-toggle" checked>
-                            <span class="slider"></span>
-                        </label>
-                        <span id="readonly-status" class="readonly-pill protected">Protected</span>
-                    </div>
+                    <span id="health-score">--</span>
+                    <span id="health-status" class="status-badge">Loading...</span>
                 </div>
             </div>
         </header>
@@ -42,7 +33,6 @@
             <button class="tab-btn" data-tab="logs">Logs</button>
             <button class="tab-btn" data-tab="api">pRPC API</button>
             <button class="tab-btn" data-tab="network">Network</button>
-            <button class="tab-btn" data-tab="graphs">Graphs</button>
             <button class="tab-btn" data-tab="terminal">Terminal</button>
         </nav>
 
@@ -74,16 +64,6 @@
                         <div class="stat-value" id="uptime">--</div>
                         <div class="stat-label">System</div>
                     </div>
-                    <div class="card">
-                        <h3>Earned Credits</h3>
-                        <div class="stat-value" id="credits-earned">--</div>
-                        <div class="stat-label">My pod</div>
-                    </div>
-                    <div class="card">
-                        <h3>Max Credits (95th)</h3>
-                        <div class="stat-value" id="credits-max">--</div>
-                        <div class="stat-label">95th percentile</div>
-                    </div>
                 </div>
 
                 <!-- Service Status -->
@@ -101,29 +81,13 @@
                         <p>Loading...</p>
                     </div>
                 </div>
-
-                <!-- DevNet Eligibility -->
-                <div class="section">
-                    <h3>DevNet Incentive</h3>
-                    <div class="action-bar">
-                        <button class="btn btn-primary" onclick="checkEligibility()">Check Eligibility</button>
-                        <button class="btn btn-secondary" onclick="loadDashboardCredits()">Refresh Credits</button>
-                    </div>
-                    <div id="eligibility-output" class="stat-label">--</div>
-                </div>
-
-                <!-- Storage -->
-                <div class="section">
-                    <h3>Storage</h3>
-                    <p id="xandeum-pages">Xandeum-Pages: --</p>
-                </div>
             </div>
 
             <!-- Services Tab -->
             <div id="services-tab" class="tab-content">
                 <h2>Service Management</h2>
                 <div class="action-bar">
-                    <button class="btn btn-primary" data-protected="true" onclick="restartAllServices()">Restart All Services</button>
+                    <button class="btn btn-primary" onclick="restartAllServices()">Restart All Services</button>
                     <button class="btn btn-secondary" onclick="refreshServices()">Refresh</button>
                 </div>
                 <div id="services-list">
@@ -142,7 +106,7 @@
                     </select>
                     <input type="text" id="log-filter" placeholder="Filter logs (e.g., 'error', 'pubkey')">
                     <button class="btn btn-primary" onclick="loadLogs()">Load Logs</button>
-                    <button class="btn btn-secondary" data-protected="true" onclick="findPubkey()">Find Pubkey</button>
+                    <button class="btn btn-secondary" onclick="findPubkey()">Find Pubkey</button>
                 </div>
                 <div id="logs-output" class="logs-container">
                     <p>Select a service and click "Load Logs"</p>
@@ -176,48 +140,23 @@
                 </div>
             </div>
 
-            <!-- Graphs Tab -->
-            <div id="graphs-tab" class="tab-content">
-                <h2>Graphs</h2>
-                <div class="graph-controls">
-                    <button class="btn btn-secondary" data-range="10m" onclick="setGraphRange("10m")">10m</button>
-                    <button class="btn btn-secondary" data-range="6h" onclick="setGraphRange("6h")">6h</button>
-                    <button class="btn btn-secondary" data-range="24h" onclick="setGraphRange("24h")">24h</button>
-                </div>
-                <div class="graphs-grid">
-                    <div class="graph-card"><canvas id="chart-cpu"></canvas></div>
-                    <div class="graph-card"><canvas id="chart-memory"></canvas></div>
-                    <div class="graph-card"><canvas id="chart-disk"></canvas></div>
-                    <div class="graph-card"><canvas id="chart-credits"></canvas></div>
-                </div>
-            </div>
-
             <!-- Terminal Tab -->
             <div id="terminal-tab" class="tab-content">
                 <h2>Interactive Terminal</h2>
                 <div class="terminal-controls">
-                    <button class="btn btn-secondary" data-protected="true" onclick="sendQuickCommand('/root/check_network.sh')">Check Network</button>
-                    <button class="btn btn-secondary" data-protected="true" onclick="sendQuickCommand('systemctl status pod')">Pod Status</button>
-                    <button class="btn btn-danger" data-protected="true" onclick="reconnectTerminal()">Reconnect</button>
+                    <button class="btn btn-secondary" onclick="sendQuickCommand('wget https://raw.githubusercontent.com/Xandeum/xandminer-installer/refs/heads/master/install.sh')">Download Installer</button>
+                    <button class="btn btn-secondary" onclick="sendQuickCommand('sudo bash install.sh')">Run Installer</button>
+                    <button class="btn btn-secondary" onclick="sendQuickCommand('sudo bash install.sh -d')">Run Installer (Dev)</button>
+                    <button class="btn btn-secondary" onclick="sendQuickCommand('/root/check_network.sh')">Check Network</button>
+                    <button class="btn btn-secondary" onclick="sendQuickCommand('systemctl status pod')">Pod Status</button>
+                    <button class="btn btn-danger" onclick="reconnectTerminal()">Reconnect</button>
                 </div>
-                <div id="terminal-container" class="terminal-wrapper"></div>
+                <div class="terminal-wrapper">
+                    <div id="terminal-container"></div>
+                </div>
                 <div class="terminal-warning">
-                    <strong>⚠️ Warning:</strong> This is a real terminal. Read-Only mode blocks commands.<br><strong>Note:</strong> Running installer scripts here can break the session; use SSH for installs.
+                    <strong>⚠️ Warning:</strong> This is a real terminal. Dangerous commands will require confirmation.
                 </div>
-            </div>
-        </div>
-
-        <!-- Health Formula Modal -->
-        <div id="health-formula-modal" class="modal hidden">
-            <div class="modal-content">
-                <h3>Health Score Formula</h3>
-                <p><strong>Overall score = 40% System + 60% Services.</strong></p>
-                <ul>
-                    <li>System score: CPU, Memory, Disk thresholds (90% high, 70-80% warning).</li>
-                    <li>Service score: percent of running services.</li>
-                    <li>Status badge: Healthy ≥80, Warning ≥50, Critical &lt;50.</li>
-                </ul>
-                <button class="btn btn-secondary" onclick="toggleHealthFormula(true)">Close</button>
             </div>
         </div>
 
