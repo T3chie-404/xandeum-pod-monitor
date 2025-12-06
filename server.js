@@ -437,7 +437,7 @@ const PORT = config.server.port;
 server.listen(PORT, HOST, () => {
   console.log("");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-  console.log("  Xandeum Pod Monitor");
+  console.log("  Xandeum Pod Manager (Pod-Man)");
   console.log("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
   console.log("");
   console.log(`  Server:    http://${HOST}:${PORT}`);

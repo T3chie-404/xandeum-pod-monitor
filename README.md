@@ -1,65 +1,88 @@
-# Xandeum Pod Monitor
+# Xandeum Pod Manager (Pod-Man)
 
 ![Version](https://img.shields.io/badge/version-1.0.0-blue.svg)
-![License](https://img.shields.io/badge/license-MIT-green.svg)
+![License](https://img.shields.io/badge/license-Apache%202.0-green.svg)
 
-Interactive web-based monitoring and management dashboard for Xandeum pNodes. Monitor services, view logs, test pRPC API, diagnose network issues, and access an embedded terminal - all from a single, secure web interface.
+Interactive web-based monitoring and management dashboard for Xandeum pNodes. Monitor services, view logs, test pRPC API, diagnose network issues, track credits, view graphs, and access an embedded terminal - all from a single, secure web interface.
 
 ## Features
 
 ### 🎯 Dashboard Overview
-- Real-time system stats (CPU, RAM, disk usage, uptime)
-- Service status cards with health indicators
-- Network connectivity status
-- Overall health score (0-100%)
-- Auto-refresh every 10 seconds
+- **Real-time system stats**: CPU, RAM, disk usage, uptime (formatted as 1d 22h 30m)
+- **Service status cards**: xandminer, xandminerd, pod, xandeum-pod-monitor
+- **Network connectivity status**: External IP and public port accessibility
+- **Pod credits tracking**: Earned credits + top earner leaderboard
+- **DevNet eligibility**: 95th percentile threshold calculator
+- **Storage monitoring**: Xandeum-Pages disk usage
+- **Health score**: Composite score (0-100%) with detailed formula
+- **Auto-refresh**: Every 10 seconds
 
 ### 🔧 Service Management
-- View status for all services (xandminer, xandminerd, pod)
+- View status for all services (xandminer, xandminerd, pod, xandeum-pod-monitor)
 - Start/Stop/Restart individual services
 - Restart all services with one click
-- View service logs and outputs
+- View detailed service logs (scrollable up to 2000 chars per service)
 - Confirmation dialogs for all destructive actions
+- **Read-only safety toggle**: Protects against accidental service changes
 
 ### 📜 Log Viewer
-- View logs for any service (last 100 lines)
-- Filter logs with search terms
-- Special "Find Pubkey" feature (restarts pod and extracts pubkey)
-- Export logs functionality
+- View logs for any service with **line selector pills**: 100, 2k, 5k, 10k lines
+- Backend supports up to **10,000 lines** (50MB buffer)
+- Filter logs with search terms (searches thousands of entries)
+- **Find Pubkey feature**: Passive grep scan (20,000 lines, no restart)
+- Only shows for pod service logs
+- Automatic pubkey caching to file
 
 ### 🔌 pRPC API Testing
 - Built-in API call buttons (get-version, get-stats, get-pods)
 - Custom RPC method input for testing
+- **Dual-pane display**: Call format (curl command) + Response
 - Formatted JSON response display
+- Shows exact curl command with your public IP
 - Error handling and timeout management
 
 ### 🌐 Network Diagnostics
-- Localhost service checks (ports 3000, 4000, 6000)
-- Public access tests (UDP 5000, 9001, TCP 6000)
+- **Localhost checks**: Ports 22, 80, 3000, 4000, 6000, 7000 (TCP)
+- **Public access tests**: UDP 5000, 9001 + TCP 22, 80, 3000, 4000, 6000
+- Shows 0.0.0.0 bindings as "PUBLIC + LOCALHOST"
 - External IP detection
-- Firewall status check
-- Visual port status indicators
+- Sorted port display (smallest → largest)
+- UDP/TCP section dividers
+- Visual status indicators (✅/❌)
+- Firewall/router forwarding reminder
+
+### 📊 Graphs
+- **4 graphs in 2×2 grid**: CPU, RAM, Disk, Credits
+- **Time ranges**: 10m, 6h, 24h (CPU/RAM/Disk) + **40 days** (Credits)
+- **Persistent storage**: localStorage cache with 24h retention (40d for credits)
+- Background data collection every 10 seconds (regardless of tab)
+- Automatic axis scaling: CPU/RAM/Disk 0-100%, Credits 0-90k
+- Simplified x-axis labels (e.g., "-10m → now" or "-2.2d → now")
+- Chart titles overlay (CPU, RAM, DISK, CREDITS)
 
 ### 💻 Embedded Terminal
 - Full interactive terminal using xterm.js
-- Quick command buttons for common tasks
-- Dangerous command detection with confirmation prompts
+- **Read-only guard**: Terminal access blocked when safety toggle is on
+- Reconnect button for session recovery
 - Session management with timeouts
 - Terminal activity logging for audit
+- Warning about installer scripts breaking sessions
 
 ### 🛡️ Security Features
 - **Localhost-only by default** (127.0.0.1:7000)
-- **Command whitelist** - Only predefined services can be controlled
-- **Dangerous command warnings** - Detects and blocks risky commands
-- **Rate limiting** - Prevents API abuse (60 requests/minute)
-- **Input validation** - All user inputs are sanitized
-- **Session limits** - Max 3 terminal sessions
-- **Activity logging** - All terminal commands are logged
-- **Confirmation dialogs** - For all destructive actions
+- **Read-only safety toggle**: Defaults to "Protected" mode, blocks all dangerous actions
+- **Command whitelist**: Only predefined services can be controlled
+- **Dangerous command warnings**: Detects and blocks risky commands in terminal
+- **Rate limiting**: Prevents API abuse (60 requests/minute)
+- **Input validation**: All user inputs are sanitized
+- **Session limits**: Prevents resource exhaustion
+- **Activity logging**: All terminal commands logged
+- **Confirmation dialogs**: For all destructive actions
+- **Self-restart prevention**: Monitor service can't restart itself via UI
 
 ## 🚀 Quick Start: Turn-Key HTTPS Setup
 
-**NEW!** The easiest way to enable secure HTTPS access for non-technical users:
+**NEW!** The easiest way to enable secure HTTPS access:
 
 ```bash
 cd /root/xandeum-pod-monitor
@@ -68,9 +91,11 @@ sudo bash setup-https.sh
 
 This interactive wizard will:
 - ✅ Install and configure nginx automatically
+- ✅ Auto-disable default nginx site (prevents port conflicts)
 - ✅ Generate SSL certificates (self-signed or Let's Encrypt)
 - ✅ Set up password authentication
 - ✅ Configure secure reverse proxy
+- ✅ Start nginx service automatically
 - ✅ Test and verify the setup
 
 **No manual configuration needed!** Just answer a few simple questions:
@@ -80,6 +105,8 @@ This interactive wizard will:
 4. Self-signed or Let's Encrypt certificate?
 
 Then access your monitor at: `https://YOUR-IP:8443`
+
+**Note:** localhost:80/stats continues to work (pod service serves it separately).
 
 ### Options
 
@@ -154,7 +181,7 @@ http://localhost:7000
 
 ### Public Access (Optional)
 
-For public access with HTTPS and authentication, see [nginx-config-example/](nginx-config-example/).
+For public access with HTTPS and authentication, run `sudo bash setup-https.sh`.
 
 ## Configuration
 
@@ -185,28 +212,29 @@ Edit `config.json` to customize:
 
 - **Localhost-only**: Binds to 127.0.0.1 by default
 - **No public exposure**: Requires SSH tunnel for remote access
-- **No authentication needed**: Safe because it's localhost-only
+- **Read-only toggle**: Defaults to "Protected" mode
 - **Minimal attack surface**: Only runs what's necessary
 
 ### ⚠️ If Exposing Publicly
 
-If you change `host` to `0.0.0.0` for public access:
+If you run `setup-https.sh` or change `host` to `0.0.0.0`:
 
-1. **Use nginx reverse proxy** with basic auth (see nginx-config-example/)
+1. **Use nginx reverse proxy** with basic auth (setup-https.sh does this)
 2. **Use HTTPS** with valid certificate (Let's Encrypt recommended)
 3. **Enable firewall** and only allow specific IPs if possible
-4. **Consider disabling terminal** (`enableTerminal: false`)
+4. **Keep read-only toggle ON** when not making changes
 5. **Monitor access logs** regularly
 
 ### 🛡️ Built-in Protections
 
-- **Command whitelist**: Only xandminer, xandminerd, pod services
+- **Command whitelist**: Only xandminer, xandminerd, pod, xandeum-pod-monitor
 - **Action whitelist**: Only start, stop, restart, status
 - **Input sanitization**: All user inputs are validated
-- **Dangerous command detection**: Warns before executing risky commands
-- **Rate limiting**: Prevents brute force and DoS
+- **Dangerous command detection**: Warns before executing risky terminal commands
+- **Rate limiting**: Prevents brute force and DoS (60 req/min)
 - **Session limits**: Prevents resource exhaustion
 - **Activity logging**: Audit trail for all terminal commands
+- **Self-restart block**: Monitor service cannot restart itself via API
 
 ## Attack Vectors Mitigated
 
@@ -214,37 +242,48 @@ If you change `host` to `0.0.0.0` for public access:
 |--------------|------------|
 | Command injection | Parameterized commands, input validation |
 | Fork bomb | Terminal session limits, command detection |
-| Disk wiping | Dangerous command warnings, confirmation |
+| Disk wiping | Dangerous command warnings, confirmation, read-only toggle |
 | Resource exhaustion | Rate limiting, session timeouts, line limits |
-| Unauthorized access | Localhost-only, optional nginx auth |
-| Service manipulation | Whitelist-based validation |
-| Log flooding | Max line limits (1000 lines) |
+| Unauthorized access | Localhost-only default, optional nginx basic auth |
+| Service manipulation | Whitelist-based validation, read-only toggle |
+| Log flooding | Max line limits (10,000 lines), 50MB buffer |
 | Memory leaks | Periodic cleanup, activity log rotation |
+| Accidental changes | Read-only safety toggle (defaults to protected) |
 
 ## API Endpoints
 
 | Endpoint | Method | Description |
 |----------|--------|-------------|
-| `/api/dashboard` | GET | Full dashboard data |
+| `/api/dashboard` | GET | Full dashboard data (system, services, network) |
 | `/api/services` | GET | All service statuses |
 | `/api/services/:name` | GET | Single service status |
-| `/api/services/:name/:action` | POST | Control service |
-| `/api/services/restart-all` | POST | Restart all services |
-| `/api/logs/:service` | GET | Get service logs |
-| `/api/find-pubkey` | POST | Restart pod and find pubkey |
+| `/api/services/:name/:action` | POST | Control service (requires read-only off) |
+| `/api/services/restart-all` | POST | Restart all services (requires read-only off) |
+| `/api/logs/:service` | GET | Get service logs (query: lines, filter) |
+| `/api/find-pubkey` | POST | Restart pod and extract pubkey from logs |
+| `/api/pod-pubkey` | GET | Passive pubkey scan (20k lines, no restart, cached) |
+| `/api/pod-credits` | GET | Global credits list + local credits |
+| `/api/devnet-eligibility` | GET | Credits analysis with 95th percentile |
 | `/api/prpc/:method` | POST | Call pRPC method |
-| `/api/network` | GET | Network diagnostics |
-| `/api/system` | GET | System stats |
-| `/api/health` | GET | Health check |
-| `/terminal` | WebSocket | Terminal connection |
+| `/api/network` | GET | Network diagnostics (localhost + public ports) |
+| `/api/system` | GET | System stats (CPU, RAM, Disk, Uptime, Xandeum-Pages) |
+| `/api/health` | GET | Health check with score calculation |
+| `/terminal` | WebSocket | Terminal connection (requires read-only off) |
+
+## Data Persistence
+
+- **Metrics cache**: Browser localStorage (24h retention for CPU/RAM/Disk, 40 days for Credits)
+- **Pubkey cache**: File-based `/tmp/xpm_pubkey_cache.txt` + in-memory
+- **IP cache**: Browser localStorage for instant pRPC curl command display
+- **Survives**: Page reloads, browser restarts, service restarts
 
 ## System Requirements
 
 - **OS**: Linux (Ubuntu 20.04+ recommended)
 - **Node.js**: v16.0.0 or higher
-- **RAM**: 50MB (minimal footprint)
+- **RAM**: 50MB (minimal footprint, 512MB limit via systemd)
 - **Disk**: 50MB
-- **Network**: Localhost (no external dependencies)
+- **Network**: Localhost (no external dependencies for core functionality)
 
 ## Troubleshooting
 
@@ -256,11 +295,15 @@ sudo netstat -tulpn | grep 7000
 
 # Check logs
 sudo journalctl -u xandeum-pod-monitor -n 50
+
+# Check for syntax errors
+sudo node -c /root/xandeum-pod-monitor/server.js
 ```
 
 ### Terminal not connecting
 
-- Check WebSocket connection in browser console
+- Ensure **Read-Only toggle is OFF** (terminal blocked when protected)
+- Check WebSocket connection in browser console (F12)
 - Ensure `enableTerminal: true` in config.json
 - Check if node-pty is installed: `npm list node-pty`
 
@@ -268,12 +311,33 @@ sudo journalctl -u xandeum-pod-monitor -n 50
 
 - Verify services are running: `systemctl status pod xandminer xandminerd`
 - Check permissions: Monitor must run as root for systemctl access
+- Check read-only toggle is OFF for service control
 
 ### Can't access pRPC API
 
 - Ensure pod service is running
 - Check pRPC is listening: `netstat -tulpn | grep 6000`
-- Verify port configuration in config.json
+- Verify port 6000 is accessible
+
+### Graphs not showing data
+
+- Wait 1-2 minutes for metrics to accumulate (collected every 10s)
+- Check browser console for errors (F12)
+- Clear browser cache and localStorage if needed
+- Stay on any tab - metrics collect in background
+
+### Credits not showing
+
+- Pubkey must be detected (check Logs tab → pod → Find Pubkey)
+- Pubkey cache: `/tmp/xpm_pubkey_cache.txt`
+- Force scan: DevNet section → "Force Pubkey Scan" button
+- Credits API: `https://pods-credit.vercel.app/api/pods-credits`
+
+### 10k log selector fails
+
+- Backend has 50MB buffer for large log outputs
+- Request timeout: 15s frontend, 20s backend
+- If fails: try 5k instead or wait and retry
 
 ## Development
 
@@ -286,6 +350,8 @@ npm run dev
 
 # Test API endpoints
 curl http://127.0.0.1:7000/api/health
+curl http://127.0.0.1:7000/api/devnet-eligibility
+curl http://127.0.0.1:7000/api/pod-credits
 ```
 
 ## Contributing
@@ -298,21 +364,28 @@ curl http://127.0.0.1:7000/api/health
 
 ## License
 
-MIT License - see [LICENSE](LICENSE) file for details
+Apache License 2.0 - see [LICENSE](LICENSE) file for details
 
 ## Author
 
 **T3chie-404**
 - GitHub: [@T3chie-404](https://github.com/T3chie-404)
+- Repository: [xandeum-pod-monitor](https://github.com/T3chie-404/xandeum-pod-monitor)
 
 ## Acknowledgments
 
 - [Xandeum Network](https://xandeum.network) - For the pNode software
 - [xterm.js](https://xtermjs.org/) - For the excellent terminal emulator
 - [node-pty](https://github.com/microsoft/node-pty) - For PTY support
+- [Chart.js](https://www.chartjs.org/) - For beautiful graphs
 
 ## Support
 
 For issues, questions, or contributions:
 - Open an issue on [GitHub](https://github.com/T3chie-404/xandeum-pod-monitor/issues)
-- Read the [Xandeum Documentation](https://docs.xandeum.network)
+- Star the repository if you find it useful!
+
+---
+
+**Made with ⚡ for the Xandeum community**
+

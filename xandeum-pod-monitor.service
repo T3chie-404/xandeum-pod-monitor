@@ -1,5 +1,5 @@
 [Unit]
-Description=Xandeum Pod Monitor Web Dashboard
+Description=Xandeum Pod Manager (Pod-Man) Web Dashboard
 After=network.target
 
 [Service]
