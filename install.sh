@@ -161,7 +161,7 @@ echo ""
 echo -e "${YELLOW}Optional: Enable HTTPS${NC}"
 echo "  • Run: sudo bash $INSTALL_DIR/setup-https.sh"
 if [ -n "$SERVER_IP" ]; then
-    echo "  • Access via: https://${SERVER_IP}:8443"
+    echo "  • Access via: https://${SERVER_IP}:443"
 fi
 echo ""
 echo -e "${GREEN}Enjoy managing your Xandeum pNode! ⚡${NC}"

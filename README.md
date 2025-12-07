@@ -104,7 +104,7 @@ This interactive wizard will:
 3. Create password
 4. Self-signed or Let's Encrypt certificate?
 
-Then access your monitor at: `https://YOUR-IP:8443`
+Then access your monitor at: `https://YOUR-IP:443`
 
 **Note:** localhost:80/stats continues to work (pod service serves it separately).
 

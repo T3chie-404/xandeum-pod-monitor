@@ -175,7 +175,7 @@ echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━
 echo ""
 
 # Determine port
-HTTPS_PORT=${HTTPS_PORT:-8443}
+HTTPS_PORT=${HTTPS_PORT:-443}
 
 # Get server name (IP or domain)
 if [ -n "$DOMAIN" ]; then
