@@ -136,7 +136,7 @@ else
     openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
         -keyout /etc/ssl/xandeum/monitor.key \
         -out /etc/ssl/xandeum/monitor.crt \
-        -subj "/C=US/ST=State/L=City/O=Xandeum/CN=xandeum-monitor" \
+        -subj "/C=US/ST=State/L=City/O=Xandeum/CN=pod-manager" \
         >/dev/null 2>&1
     
     echo -e "${GREEN}✓${NC} Generated self-signed SSL certificate (valid 365 days)"
@@ -213,8 +213,8 @@ server {
     }
     
     # Logs
-    access_log /var/log/nginx/xandeum-monitor-access.log;
-    error_log /var/log/nginx/xandeum-monitor-error.log;
+    access_log /var/log/nginx/pod-manager-access.log;
+    error_log /var/log/nginx/pod-manager-error.log;
 }
 EOF
 
@@ -280,7 +280,7 @@ fi
 echo "Additional commands:"
 echo "  Test nginx:    sudo nginx -t"
 echo "  Reload nginx:  sudo systemctl reload nginx"
-echo "  View logs:     sudo tail -f /var/log/nginx/xandeum-monitor-*.log"
+echo "  View logs:     sudo tail -f /var/log/nginx/pod-manager-*.log"
 echo "  Remove HTTPS:  sudo bash setup-https.sh --remove"
 echo ""
 

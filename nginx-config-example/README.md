@@ -47,8 +47,8 @@ sudo htpasswd /etc/nginx/.htpasswd username
 
 ```bash
 sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout /etc/ssl/private/xandeum-monitor.key \
-  -out /etc/ssl/certs/xandeum-monitor.crt
+  -keyout /etc/ssl/private/pod-manager.key \
+  -out /etc/ssl/certs/pod-manager.crt
 ```
 
 **Option B: Let's Encrypt (recommended for production)**
@@ -219,8 +219,8 @@ sudo certbot renew
 
 # For self-signed (recreate)
 sudo openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
-  -keyout /etc/ssl/private/xandeum-monitor.key \
-  -out /etc/ssl/certs/xandeum-monitor.crt
+  -keyout /etc/ssl/private/pod-manager.key \
+  -out /etc/ssl/certs/pod-manager.crt
 sudo systemctl reload nginx
 ```
 
