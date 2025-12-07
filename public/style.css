@@ -710,3 +710,13 @@ h3 {
     border-color: var(--primary-color);
     color: white;
 }
+
+/* Logout button in header */
+.header-content .btn-small {
+    padding: 8px 16px;
+    font-size: 13px;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}

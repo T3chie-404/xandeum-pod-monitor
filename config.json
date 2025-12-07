@@ -33,5 +33,21 @@
       "> /dev/sda",
       "chmod -R 777 /"
     ]
+  },
+  "authentication": {
+    "enabled": true,
+    "sessionSecret": "1f09172e651ed084069c0f3b5deb050f4322fcc4bb20a4f27b6b5ef34abda49e",
+    "sessionTimeout": 86400000,
+    "users": [
+      {
+        "username": "bradkuhl",
+        "password": "$2b$10$vUyXVqMKVfiIUKeA/P/Vi.2yswdtwyNnbvZCJscBLaCyUMIbaniGy",
+        "role": "admin"
+      }
+    ]
+  },
+  "demoMode": {
+    "enabled": false,
+    "systemUserCreated": false
   }
 }

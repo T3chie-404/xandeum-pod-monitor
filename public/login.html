@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Login - Xandeum Pod Manager</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+            color: #e2e8f0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .login-container {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 40px;
+            max-width: 400px;
+            width: 100%;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+        }
+
+        .user-mgmt-container {
+            background: #1e293b;
+            border-radius: 12px;
+            padding: 40px;
+            max-width: 600px;
+            width: 100%;
+            box-shadow: 0 8px 16px rgba(0, 0, 0, 0.3);
+            margin-top: 20px;
+            display: none;
+        }
+
+        h1 {
+            color: #6366f1;
+            margin-bottom: 10px;
+            font-size: 28px;
+            text-align: center;
+        }
+
+        h2 {
+            color: #8b5cf6;
+            margin-bottom: 20px;
+            font-size: 20px;
+        }
+
+        .subtitle {
+            color: #94a3b8;
+            margin-bottom: 30px;
+            font-size: 14px;
+            text-align: center;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 8px;
+            color: #cbd5e1;
+            font-weight: 500;
+        }
+
+        input[type="text"],
+        input[type="password"] {
+            width: 100%;
+            padding: 12px;
+            background: #0f172a;
+            border: 2px solid #334155;
+            border-radius: 6px;
+            color: #e2e8f0;
+            font-size: 14px;
+        }
+
+        input:focus {
+            outline: none;
+            border-color: #6366f1;
+        }
+
+        .btn {
+            width: 100%;
+            padding: 12px;
+            background: #6366f1;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+        }
+
+        .btn:hover {
+            background: #4f46e5;
+        }
+
+        .btn-secondary {
+            background: #8b5cf6;
+        }
+
+        .btn-secondary:hover {
+            background: #7c3aed;
+        }
+
+        .btn-small {
+            padding: 8px 16px;
+            font-size: 14px;
+            width: auto;
+        }
+
+        .btn-danger {
+            background: #ef4444;
+        }
+
+        .btn-danger:hover {
+            background: #dc2626;
+        }
+
+        .error {
+            background: rgba(239, 68, 68, 0.1);
+            border: 1px solid #ef4444;
+            color: #fca5a5;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .success {
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid #10b981;
+            color: #6ee7b7;
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            display: none;
+        }
+
+        .user-list {
+            margin-top: 20px;
+        }
+
+        .user-row {
+            background: #0f172a;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 10px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .role-badge {
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 600;
+            margin-left: 10px;
+        }
+
+        .role-admin {
+            background: #6366f1;
+            color: white;
+        }
+
+        .role-demo {
+            background: #8b5cf6;
+            color: white;
+        }
+
+        .role-toggle {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+
+        .role-toggle label {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <div>
+        <div class="login-container">
+            <h1>⚡ Pod Manager</h1>
+            <p class="subtitle">Sign in to continue</p>
+
+            <div id="login-message"></div>
+
+            <form id="login-form">
+                <div class="form-group">
+                    <label for="username">Username</label>
+                    <input type="text" id="username" required autofocus>
+                </div>
+
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <input type="password" id="password" required>
+                </div>
+
+                <button type="submit" class="btn">Login</button>
+            </form>
+        </div>
+
+        <div class="user-mgmt-container" id="user-management">
+            <h2>User Management</h2>
+
+            <div id="mgmt-message"></div>
+
+            <div class="form-group">
+                <label>Add New User</label>
+                <input type="text" id="new-username" placeholder="Username">
+            </div>
+
+            <div class="form-group">
+                <input type="password" id="new-password" placeholder="Password">
+            </div>
+
+            <div class="role-toggle">
+                <label>
+                    <input type="radio" name="new-role" value="admin" checked>
+                    Admin
+                </label>
+                <label>
+                    <input type="radio" name="new-role" value="demo">
+                    Demo
+                </label>
+            </div>
+
+            <button class="btn btn-secondary" onclick="addUser()">Add User</button>
+
+            <div class="user-list">
+                <h3 style="color: #cbd5e1; margin-bottom: 10px;">Current Users</h3>
+                <div id="user-list"></div>
+            </div>
+
+            <button class="btn" onclick="window.location.href='/index.html'">Go to Dashboard</button>
+        </div>
+    </div>
+
+    <script src="login.js"></script>
+</body>
+</html>
+

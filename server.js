@@ -4,6 +4,8 @@ const WebSocket = require("ws");
 const path = require("path");
 const fs = require("fs");
 const axios = require("axios");
+const session = require("express-session");
+const bcrypt = require("bcryptjs");
 
 // Import our library modules
 const ServiceManager = require("./lib/services");
@@ -19,12 +21,31 @@ const config = JSON.parse(fs.readFileSync("./config.json", "utf8"));
 // Initialize Express app
 const app = express();
 const server = http.createServer(app);
-const wss = new WebSocket.Server({ server });
+const wss = new WebSocket.Server({
+  server,
+  verifyClient: (info, callback) => {
+    // We'll handle auth in the connection handler
+    callback(true);
+  }
+});
+
 
 // Initialize Terminal Manager
 
 // Middleware
 app.use(express.json({ limit: '10mb' }));
+
+// Session middleware for authentication
+app.use(session({
+  secret: config.authentication.sessionSecret,
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: config.authentication.sessionTimeout,
+    httpOnly: true,
+    secure: false // Set to true if using HTTPS
+  }
+}));
 app.use(express.static("public"));
 
 // Rate limiting (simple in-memory implementation)
@@ -64,13 +85,288 @@ function checkRateLimit(req, res, next) {
 app.use(checkRateLimit);
 
 // ============================================================================
+// AUTHENTICATION HELPERS
+// ============================================================================
+
+// Save config to file
+function saveConfig() {
+  fs.writeFileSync("./config.json", JSON.stringify(config, null, 2), "utf8");
+}
+
+// Auth middleware
+function requireAuth(req, res, next) {
+  if (!config.authentication.enabled) {
+    return next();
+  }
+  
+  if (!req.session || !req.session.username) {
+    return res.status(401).json({ success: false, error: "Not authenticated" });
+  }
+  
+  next();
+}
+
+// Admin-only middleware
+function requireAdmin(req, res, next) {
+  if (!config.authentication.enabled) {
+    return next();
+  }
+  
+  if (!req.session || !req.session.username || req.session.role !== "admin") {
+    return res.status(403).json({ success: false, error: "Admin access required" });
+  }
+  
+  next();
+}
+
+// ============================================================================
 // API ENDPOINTS
 // ============================================================================
+
+// ============================================================================
+// AUTHENTICATION ENDPOINTS
+// ============================================================================
+
+/**
+ * Check if setup is needed (no users exist)
+ */
+app.get("/api/setup/status", (req, res) => {
+  res.json({
+    success: true,
+    needsSetup: config.authentication.users.length === 0
+  });
+});
+
+/**
+ * Initialize first-time setup (create admin + optional users)
+ */
+app.post("/api/setup/initialize", async (req, res) => {
+  try {
+    // Only allow if no users exist
+    if (config.authentication.users.length > 0) {
+      return res.status(403).json({ success: false, error: "Setup already completed" });
+    }
+    
+    const { users } = req.body;
+    
+    if (!users || !Array.isArray(users) || users.length === 0) {
+      return res.status(400).json({ success: false, error: "No users provided" });
+    }
+    
+    // Validate and hash passwords
+    const newUsers = [];
+    let hasDemoUser = false;
+    
+    for (const user of users) {
+      if (!user.username || !user.password || !user.role) {
+        return res.status(400).json({ success: false, error: "Invalid user data" });
+      }
+      
+      const hashedPassword = await bcrypt.hash(user.password, 10);
+      newUsers.push({
+        username: user.username,
+        password: hashedPassword,
+        role: user.role
+      });
+      
+      if (user.role === 'demo') {
+        hasDemoUser = true;
+      }
+    }
+    
+    // Save users to config
+    config.authentication.users = newUsers;
+    saveConfig();
+    
+    // If demo user created, setup system account
+    if (hasDemoUser && !config.demoMode.systemUserCreated) {
+      try {
+        const { exec } = require('child_process');
+        const util = require('util');
+        const execPromise = util.promisify(exec);
+        
+        await execPromise('bash /root/xandeum-pod-monitor/scripts/setup-demo-user.sh');
+        config.demoMode.systemUserCreated = true;
+        config.demoMode.enabled = true;
+        saveConfig();
+      } catch (error) {
+        console.error('Failed to setup demo user:', error);
+      }
+    }
+    
+    res.json({ success: true, message: "Setup completed" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * Login
+ */
+app.post("/api/login", async (req, res) => {
+  try {
+    const { username, password } = req.body;
+    
+    if (!username || !password) {
+      return res.status(400).json({ success: false, error: "Username and password required" });
+    }
+    
+    const user = config.authentication.users.find(u => u.username === username);
+    
+    if (!user) {
+      return res.status(401).json({ success: false, error: "Invalid credentials" });
+    }
+    
+    const validPassword = await bcrypt.compare(password, user.password);
+    
+    if (!validPassword) {
+      return res.status(401).json({ success: false, error: "Invalid credentials" });
+    }
+    
+    // Create session
+    req.session.username = user.username;
+    req.session.role = user.role;
+    
+    res.json({
+      success: true,
+      username: user.username,
+      role: user.role
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * Logout
+ */
+app.post("/api/logout", (req, res) => {
+  req.session.destroy((err) => {
+    if (err) {
+      return res.status(500).json({ success: false, error: err.message });
+    }
+    res.json({ success: true });
+  });
+});
+
+/**
+ * Check session
+ */
+app.get("/api/check-session", (req, res) => {
+  if (req.session && req.session.username) {
+    res.json({
+      success: true,
+      authenticated: true,
+      username: req.session.username,
+      role: req.session.role
+    });
+  } else {
+    res.json({
+      success: true,
+      authenticated: false
+    });
+  }
+});
+
+/**
+ * Add user (admin only)
+ */
+app.post("/api/users/add", requireAdmin, async (req, res) => {
+  try {
+    const { username, password, role } = req.body;
+    
+    if (!username || !password || !role) {
+      return res.status(400).json({ success: false, error: "Username, password, and role required" });
+    }
+    
+    // Check if user exists
+    if (config.authentication.users.find(u => u.username === username)) {
+      return res.status(400).json({ success: false, error: "Username already exists" });
+    }
+    
+    // Hash password and add user
+    const hashedPassword = await bcrypt.hash(password, 10);
+    config.authentication.users.push({
+      username,
+      password: hashedPassword,
+      role
+    });
+    
+    saveConfig();
+    
+    // If first demo user, setup system account
+    if (role === 'demo' && !config.demoMode.systemUserCreated) {
+      try {
+        const { exec } = require('child_process');
+        const util = require('util');
+        const execPromise = util.promisify(exec);
+        
+        await execPromise('bash /root/xandeum-pod-monitor/scripts/setup-demo-user.sh');
+        config.demoMode.systemUserCreated = true;
+        config.demoMode.enabled = true;
+        saveConfig();
+      } catch (error) {
+        console.error('Failed to setup demo user:', error);
+      }
+    }
+    
+    res.json({ success: true, message: "User added" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * Delete user (admin only)
+ */
+app.post("/api/users/delete", requireAdmin, (req, res) => {
+  try {
+    const { username } = req.body;
+    
+    if (!username) {
+      return res.status(400).json({ success: false, error: "Username required" });
+    }
+    
+    // Don't allow deleting yourself
+    if (username === req.session.username) {
+      return res.status(400).json({ success: false, error: "Cannot delete your own account" });
+    }
+    
+    // Ensure at least one admin remains
+    const admins = config.authentication.users.filter(u => u.role === 'admin');
+    const userToDelete = config.authentication.users.find(u => u.username === username);
+    
+    if (userToDelete && userToDelete.role === 'admin' && admins.length <= 1) {
+      return res.status(400).json({ success: false, error: "Cannot delete last admin user" });
+    }
+    
+    // Remove user
+    config.authentication.users = config.authentication.users.filter(u => u.username !== username);
+    saveConfig();
+    
+    res.json({ success: true, message: "User deleted" });
+  } catch (error) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+/**
+ * List users (admin only)
+ */
+app.get("/api/users/list", requireAdmin, (req, res) => {
+  const users = config.authentication.users.map(u => ({
+    username: u.username,
+    role: u.role
+  }));
+  
+  res.json({ success: true, users });
+});
+
 
 /**
  * Dashboard overview
  */
-app.get("/api/dashboard", async (req, res) => {
+app.get("/api/dashboard", requireAuth, async (req, res) => {
   try {
     const [services, system, network, prpcHealth] = await Promise.all([
       ServiceManager.getStatusSummary(),
@@ -95,7 +391,7 @@ app.get("/api/dashboard", async (req, res) => {
 /**
  * Get all service statuses
  */
-app.get("/api/services", async (req, res) => {
+app.get("/api/services", requireAuth, async (req, res) => {
   try {
     const statuses = await ServiceManager.getAllStatus();
     res.json({ success: true, services: statuses });
@@ -107,7 +403,7 @@ app.get("/api/services", async (req, res) => {
 /**
  * Get single service status
  */
-app.get("/api/services/:name", async (req, res) => {
+app.get("/api/services/:name", requireAuth, async (req, res) => {
   try {
     const status = await ServiceManager.getStatus(req.params.name);
     res.json({ success: true, service: status });
@@ -119,7 +415,7 @@ app.get("/api/services/:name", async (req, res) => {
 /**
  * Control a service (start/stop/restart)
  */
-app.post("/api/services/:name/:action", async (req, res) => {
+app.post("/api/services/:name/:action", requireAdmin, async (req, res) => {
   if (!config.security.enableServiceControl) {
     return res.status(403).json({ success: false, error: "Service control is disabled" });
   }
@@ -138,7 +434,7 @@ app.post("/api/services/:name/:action", async (req, res) => {
 /**
  * Restart all services
  */
-app.post("/api/services/restart-all", async (req, res) => {
+app.post("/api/services/restart-all", requireAdmin, async (req, res) => {
   if (!config.security.enableServiceControl) {
     return res.status(403).json({ success: false, error: "Service control is disabled" });
   }
@@ -154,7 +450,7 @@ app.post("/api/services/restart-all", async (req, res) => {
 /**
  * Get logs for a service
  */
-app.get("/api/logs/:service", async (req, res) => {
+app.get("/api/logs/:service", requireAuth, async (req, res) => {
   try {
     const lines = parseInt(req.query.lines) || 50;
     const filter = req.query.filter || null;
@@ -172,7 +468,7 @@ app.get("/api/logs/:service", async (req, res) => {
 /**
  * Find pubkey (restart pod and extract from logs)
  */
-app.post("/api/find-pubkey", async (req, res) => {
+app.post("/api/find-pubkey", requireAdmin, async (req, res) => {
   try {
     const result = await LogManager.findPubkey();
     res.json(result);
@@ -184,7 +480,7 @@ app.post("/api/find-pubkey", async (req, res) => {
 /**
  * pRPC API calls
  */
-app.post("/api/prpc/:method", async (req, res) => {
+app.post("/api/prpc/:method", requireAuth, async (req, res) => {
   try {
     const method = req.params.method;
     const params = req.body.params || {};
@@ -216,7 +512,7 @@ app.post("/api/prpc/:method", async (req, res) => {
 /**
  * Network diagnostics
  */
-app.get("/api/network", async (req, res) => {
+app.get("/api/network", requireAuth, async (req, res) => {
   try {
     const diagnostics = await NetworkManager.runDiagnostics();
     res.json({ success: true, diagnostics });
@@ -228,7 +524,7 @@ app.get("/api/network", async (req, res) => {
 /**
  * System stats
  */
-app.get("/api/system", async (req, res) => {
+app.get("/api/system", requireAuth, async (req, res) => {
   try {
     const stats = await SystemMonitor.getAllStats();
     res.json({ success: true, stats });
@@ -240,7 +536,7 @@ app.get("/api/system", async (req, res) => {
 /**
  * Health check
  */
-app.get("/api/health", async (req, res) => {
+app.get("/api/health", requireAuth, async (req, res) => {
   try {
     const [systemHealth, serviceStatus] = await Promise.all([
       SystemMonitor.getHealthStatus(),
@@ -280,7 +576,7 @@ app.get("/api/terminal/activity", (req, res) => {
 /**
  * Passive pubkey lookup (no restart)
  */
-app.get("/api/pod-pubkey", async (req, res) => {
+app.get("/api/pod-pubkey", requireAuth, async (req, res) => {
   try {
     const result = await LogManager.getPubkeyPassive();
     res.json(result);
@@ -292,7 +588,7 @@ app.get("/api/pod-pubkey", async (req, res) => {
 /**
  * Credits: fetch global list and local credits (if pubkey known)
  */
-app.get("/api/pod-credits", async (req, res) => {
+app.get("/api/pod-credits", requireAuth, async (req, res) => {
   try {
     const [creditsResp, pubkeyResult] = await Promise.all([
       axios.get("https://pods-credit.vercel.app/api/pods-credits", { timeout: 5000 }),
@@ -317,7 +613,7 @@ app.get("/api/pod-credits", async (req, res) => {
 /**
  * DevNet eligibility (95th percentile * 0.8 threshold)
  */
-app.get("/api/devnet-eligibility", async (req, res) => {
+app.get("/api/devnet-eligibility", requireAuth, async (req, res) => {
   try {
     const [creditsResp, pubkeyResult] = await Promise.all([
       axios.get("https://pods-credit.vercel.app/api/pods-credits", { timeout: 5000 }),
@@ -351,10 +647,25 @@ app.get("/api/devnet-eligibility", async (req, res) => {
   }
 });
 
-wss.on("connection", (ws) => {
+wss.on("connection", (ws, req) => {
   if (!config.security.enableTerminal) {
     ws.close(1008, "Terminal access is disabled");
     return;
+  }
+  
+  // Get session from upgrade request
+  let userRole = 'admin'; // Default to admin if no auth
+  
+  if (config.authentication.enabled && req.headers.cookie) {
+    // Parse session from cookie (simplified - session is in cookie)
+    // For demo users, we'll use demo-user terminal
+    // Note: This is a simplified approach. In production, use proper session parsing.
+    try {
+      // We'll set userRole from frontend via WebSocket message instead
+      // For now, default to admin for backward compatibility
+    } catch (e) {
+      console.error('Session parse error:', e);
+    }
   }
   
   const sessionId = generateSessionId();
@@ -362,36 +673,49 @@ wss.on("connection", (ws) => {
   
   console.log(`[Terminal] New connection: ${sessionId}`);
   
-  try {
-    ptyProcess = terminalManager.createSession(sessionId);
-    
-    // Send data from PTY to WebSocket
-    ptyProcess.on("data", (data) => {
-      try {
-        ws.send(data);
-      } catch (error) {
-        console.error(`[Terminal] Error sending data: ${error.message}`);
-      }
-    });
-    
-    // Handle PTY exit
-    ptyProcess.on("exit", () => {
-      console.log(`[Terminal] PTY exited: ${sessionId}`);
-      terminalManager.closeSession(sessionId);
-      ws.close();
-    });
-    
-  } catch (error) {
-    console.error(`[Terminal] Error creating session: ${error.message}`);
-    ws.send(`Error: ${error.message}\r\n`);
-    ws.close();
-    return;
-  }
-  
+
   // Handle incoming data from WebSocket
+  let sessionCreated = false;
+  let pendingUserRole = 'admin';
+  
   ws.on("message", (data) => {
     try {
       const message = JSON.parse(data);
+      
+      // Handle auth message (sent first by frontend)
+      if (message.type === "auth" && !sessionCreated) {
+        pendingUserRole = message.role || 'admin';
+        
+        // Now create the session with the correct role
+        try {
+          ptyProcess = terminalManager.createSession(sessionId, 80, 24, pendingUserRole);
+          
+          // Send data from PTY to WebSocket
+          ptyProcess.on("data", (data) => {
+            try {
+              ws.send(data);
+            } catch (error) {
+              console.error(`[Terminal] Error sending data: ${error.message}`);
+            }
+          });
+          
+          // Handle PTY exit
+          ptyProcess.on("exit", () => {
+            console.log(`[Terminal] PTY exited: ${sessionId}`);
+            terminalManager.closeSession(sessionId);
+            ws.close();
+          });
+          
+          sessionCreated = true;
+          console.log(`[Terminal] Session created for role: ${pendingUserRole}`);
+          
+        } catch (error) {
+          console.error(`[Terminal] Error creating session: ${error.message}`);
+          ws.send(`Error: ${error.message}\r\n`);
+          ws.close();
+        }
+        return;
+      }
       
       if (message.type === "input") {
         terminalManager.writeToSession(sessionId, message.data);

@@ -198,6 +198,23 @@ function initReadOnlyToggle() {
     const pill = document.getElementById('readonly-status');
     if (!toggle || !pill) return;
 
+    // Demo users: lock toggle in read-only mode
+    if (window.userRole === 'demo') {
+        toggle.checked = true;
+        toggle.disabled = true;
+        toggle.title = 'Demo mode - contact admin for full access';
+        pill.textContent = 'Demo Mode';
+        pill.classList.add('protected');
+        state.readOnly = true;
+        
+        // Disable all protected buttons
+        document.querySelectorAll('[data-protected="true"]').forEach(btn => {
+            btn.disabled = true;
+        });
+        
+        return; // Skip normal toggle behavior
+    }
+
     const apply = () => {
         state.readOnly = toggle.checked;
         pill.textContent = state.readOnly ? 'Protected' : 'Unprotected';
@@ -216,11 +233,32 @@ function initReadOnlyToggle() {
 }
 
 function guardDangerous() {
+    // Demo users always blocked
+    if (window.userRole === 'demo') {
+        alert('Demo mode - this action is restricted. Contact admin for full access.');
+        return true;
+    }
+    
     if (state.readOnly) {
         alert('Read-Only mode is on. Toggle off to run commands.');
         return true;
     }
     return false;
+}
+
+
+async function logout() {
+    if (!confirm('Are you sure you want to logout?')) {
+        return;
+    }
+    
+    try {
+        await fetch('/api/logout', { method: 'POST' });
+        window.location.href = '/login.html';
+    } catch (error) {
+        console.error('Logout failed:', error);
+        window.location.href = '/login.html';
+    }
 }
 
 // ============================================================================
@@ -1007,6 +1045,12 @@ function connectTerminalWebSocket() {
     
     terminalSocket.onopen = () => {
         terminal.write('\x1b[32mConnected to terminal\x1b[0m\r\n');
+        
+        // Send user role to backend
+        terminalSocket.send(JSON.stringify({
+            type: 'auth',
+            role: window.userRole || 'admin'
+        }));
         
         // Send data from terminal to WebSocket
         terminal.onData(data => {
