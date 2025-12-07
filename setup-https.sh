@@ -77,27 +77,6 @@ echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo -e "${GREEN}  Step 2: Authentication Setup${NC}"
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
-
-# Get username
-if [ -z "$HTTPS_USERNAME" ]; then
-    read -p "Enter username for web access [default: admin]: " USERNAME
-    USERNAME=${USERNAME:-admin}
-else
-    USERNAME="$HTTPS_USERNAME"
-fi
-
-# Get password
-if [ -z "$HTTPS_PASSWORD" ]; then
-    echo ""
-    echo "Please create a password for user '$USERNAME':"
-    htpasswd -c /etc/nginx/.htpasswd "$USERNAME"
-else
-    echo "$HTTPS_PASSWORD" | htpasswd -ci /etc/nginx/.htpasswd "$USERNAME"
-fi
-
-echo ""
-echo -e "${GREEN}✓${NC} Created password for user: $USERNAME"
 
 echo ""
 echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
@@ -213,8 +192,7 @@ server {
     add_header Referrer-Policy "no-referrer-when-downgrade" always;
     
     # Basic Authentication
-    auth_basic "Xandeum Pod Manager";
-    auth_basic_user_file /etc/nginx/.htpasswd;
+    # Authentication handled by application (login page)
     
     # Note: Rate limiting handled by application (server.js)
     
@@ -283,9 +261,9 @@ echo ""
 echo "Access your Pod Manager at:"
 echo -e "${BLUE}  https://$SERVER_NAME:$HTTPS_PORT${NC}"
 echo ""
-echo "Login credentials:"
-echo -e "  Username: ${BLUE}$USERNAME${NC}"
-echo -e "  Password: ${BLUE}(the one you just created)${NC}"
+echo "First-time access:"
+echo -e "  ${BLUE}Navigate to the URL above${NC}"
+echo -e "  ${BLUE}Complete setup (create admin account)${NC}"
 echo ""
 
 if [ "$USE_LETSENCRYPT" = false ]; then
