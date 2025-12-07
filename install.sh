@@ -166,4 +166,3 @@ fi
 echo ""
 echo -e "${GREEN}Enjoy managing your Xandeum pNode! ⚡${NC}"
 echo ""
-EOF
